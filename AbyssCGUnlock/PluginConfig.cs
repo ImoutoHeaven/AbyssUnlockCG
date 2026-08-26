@@ -19,6 +19,12 @@ internal static class PluginConfig
     /// <summary>本地伪造 NovelRead API 成功响应，跳过服务端校验（190103 好感度不足 / 190108 未购皮肤）。</summary>
     internal static ConfigEntry<bool> EnableNovelReadBypass = null!;
 
+    /// <summary>允许游戏当前动态列表中的未持有角色进入角色详情及本地场景页。</summary>
+    internal static ConfigEntry<bool> EnableUnownedCharacterDetail = null!;
+
+    /// <summary>绕过工作用服装入口的本地酒馆登记（低好感度）遮罩。</summary>
+    internal static ConfigEntry<bool> EnableNtrSceneEntryBypass = null!;
+
     internal static void Initialize(BasePlugin plugin)
     {
         EnableSkinStoryUnlock = plugin.Config.Bind(
@@ -44,5 +50,17 @@ internal static class PluginConfig
             nameof(EnableNovelReadBypass),
             true,
             "本地伪造 NovelRead API 成功响应（仅 Character/CharacterSkin 类型），跳过服务端校验错误 190103（好感度不足）/190108（未购皮肤）。证据：ConfirmNovelFlashbackPopupController...b__16_0 → NovelApiDataStore.RequestAsync；ApiErrorMessageBuilder.FormatServerErrorMessage。");
+
+        EnableUnownedCharacterDetail = plugin.Config.Bind(
+            "CharacterDetail",
+            nameof(EnableUnownedCharacterDetail),
+            true,
+            "允许进入游戏当前动态未持有角色列表中的角色详情，并只在 UpdateView 同步解析期间临时注入本地 CharacterData；不修改技能、突破或服务端持有状态。");
+
+        EnableNtrSceneEntryBypass = plugin.Config.Bind(
+            "CharacterDetail",
+            nameof(EnableNtrSceneEntryBypass),
+            true,
+            "绕过角色详情→交流→工作用服装的本地酒馆登记遮罩；只在原生切换回调执行期间临时置位并立即恢复，不发送请求。");
     }
 }

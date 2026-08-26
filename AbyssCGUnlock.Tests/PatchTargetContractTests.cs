@@ -63,22 +63,34 @@ public class PatchTargetContractTests
     }
 
     [Fact]
-    public void 配置项_默认开启四个绕过_符合用户决策()
+    public void 配置项_默认开启六个绕过_符合用户决策()
     {
         var src = Read("AbyssCGUnlock/PluginConfig.cs");
         Assert.Contains("EnableSkinStoryUnlock", src);
         Assert.Contains("EnableCharacterStoryUnlock", src);
         Assert.Contains("IgnoreNtrBlock", src);
         Assert.Contains("EnableNovelReadBypass", src);
+        Assert.Contains("EnableUnownedCharacterDetail", src);
+        Assert.Contains("EnableNtrSceneEntryBypass", src);
     }
 
     [Fact]
-    public void 补丁注册_包含解锁与NTR屏蔽与NovelRead伪造()
+    public void 补丁注册_包含既有解锁和动态未持有详情与NTR入口绕过()
     {
         var src = Read("AbyssCGUnlock/Patches/PatchManager.cs");
         Assert.Contains("StoryListUnlockPatch", src);
         Assert.Contains("NtrBlockDisplayPatch", src);
         Assert.Contains("NovelReadBypassPatch", src);
+        Assert.Contains("CharacterCatalogCapturePatch", src);
+        Assert.Contains("UnownedCharacterSelectionPatch", src);
+        Assert.Contains("CharacterTopLocalUnlockPatch", src);
+        Assert.Contains("CharacterTopListRefreshLocalUnlockPatch", src);
+        Assert.Contains("CharacterModelLocalUnlockPatch", src);
+        Assert.DoesNotContain("CharacterTopThumbnailModelLocalUnlockPatch", src);
+        Assert.Contains("CharacterDetailLocalUnlockPatch", src);
+        Assert.Contains("CharacterDataStoreLocalLookupPatch", src);
+        Assert.DoesNotContain("MainCharacterDetailLocalUnlockPatch", src);
+        Assert.Contains("NtrSceneEntryPatch", src);
     }
 
     [Fact]

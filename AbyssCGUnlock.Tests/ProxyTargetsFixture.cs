@@ -65,5 +65,82 @@ class  Project.Api.RecordEntity / Project.Api.NotifyEntity  (AppContentsEntityBa
 # ui_misc 主数据文本（AbyssMod dump，只读）
 逆夜袭玩法套餐 / Error Code: 190108
 和老师一起的培训 / Error Code: 190103
+
+## 角色详情纯本地解锁接缝（Project.dll 代理源码 + ISIL，2026-08-26）
+class Project.Interaction.CharacterList.SubService+__c
+M Project.Interaction.CharacterList.SubService+__c _SetupCharacterListEvent_b__33_0(CharacterInteractionThumbnailModel,SubService) -> System.Void
+M Project.Interaction.CharacterList.SubService CreateCharacterThumbnailModels() -> Il2CppSystem.Collections.Generic.IReadOnlyList<CharacterInteractionThumbnailModel>
+P Project.Interaction.CharacterList.SubService _nonHasCharaDataList : Il2CppSystem.Collections.Generic.IReadOnlyList<CharacterData>
+P Project.Interaction.CharacterList.SubService _userData : Project.User.UserData
+class Project.Interaction.AdventurerDetail.SubService+__c__DisplayClass90_0
+M Project.Interaction.AdventurerDetail.SubService+__c__DisplayClass90_0 _InitializeViewAsync_b__6(UniRx.Unit,SubService,UnityEngine.GameObject) -> System.Void
+P Project.User.CharacterData _IsTavernRegistered_k__BackingField : System.Boolean
+P Project.User.UserData _CharaDataStore_k__BackingField : Project.User.CharacterDataStore
+P Project.User.CharacterDataStore _dataList : Il2CppSystem.Collections.Generic.List<CharacterData>
+class Project.User.CharacterDataStore
+M Project.User.CharacterDataStore GetByTableId(System.Int64) -> Project.User.CharacterData
+
+## 队伍角色页与主角色详情接缝（Project.dll 代理源码 + ISIL，2026-08-26）
+class Project.CharacterTop.SubService
+M Project.CharacterTop.SubService UpdateView() -> System.Void
+M Project.CharacterTop.CharacterTopCharacterThumbnailModel CharacterTopCharacterThumbnailModel(System.Int64,Il2CppSystem.Threading.CancellationToken) -> System.Void
+class Project.CharacterTop.SubScene+_OnRefreshAsync_d__10
+P Project.CharacterTop.SubScene+_OnRefreshAsync_d__10 __1__state : System.Int32
+M Project.CharacterTop.SubScene+_OnRefreshAsync_d__10 MoveNext() -> System.Void
+M Project.CharacterTop.CharacterListWithFavoriteViewController RefreshActiveCharacterList() -> System.Void
+class Project.CharacterDetail.SubService
+# 崩溃证据：不要 patch 此复杂值类型签名；ErrorLog 显示 Harmony trampoline 在 il2cpp_value_box 访问冲突
+M Project.CharacterDetail.SubService UpdateCurrentCharacterModel(System.Int64,System.Boolean,Il2CppSystem.Threading.CancellationToken,Il2CppSystem.Nullable<CharacterInfoBoxGroupViewService.TabType>,Il2CppSystem.Nullable<CharacterMasteryTabIndex>,System.Boolean) -> System.Void
+class Project.Master.NoaMessagePack.MCharacters
+F Project.Master.NoaMessagePack.MCharacters id : System.Int64
+F Project.Master.NoaMessagePack.MCharacters open_at : System.String
+class Project.Master.MasterDataStore
+M Project.Master.MasterDataStore GetCache<T>() -> Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase<T>
+interface Absf.IServerTimeAccessor
+P Absf.IServerTimeAccessor NowTime : Il2CppSystem.DateTime
+M Project.DateTimeExtensions IsBetween(Il2CppSystem.DateTime,System.String,System.String) -> System.Boolean
+P Project.User.CharacterData MCharaId : System.Int64
+M Project.User.CharacterDataStore CreateFromMaster(System.Int64,System.Int32,System.Int32) -> Project.User.CharacterData
+
+## CharacterTop 延迟缩略图稳定性接缝（Project.dll 代理源码 + ISIL，2026-08-26）
+class Project.Outgame.CharacterModel
+M Project.Outgame.CharacterModel CreateFromUser(System.Int64,Project.AppDefine+IconSize,Il2CppSystem.Threading.CancellationToken) -> Project.Outgame.CharacterModel
+M Project.Outgame.CharacterModel CreateFromMaster(Project.User.CharacterData,Project.AppDefine+IconSize,Il2CppSystem.Threading.CancellationToken) -> Project.Outgame.CharacterModel
+# CharacterTop 构造器固定走 User 模型；User/Master 两个工厂只在 isMaster 参数上分流
+ISIL CharacterTopCharacterThumbnailModel.txt:554 Call CharacterModel.CreateFromUser
+ISIL CharacterModel.txt:1959 Call CharacterModel..ctor(..., isMaster=0, ...)
+ISIL CharacterModel.txt:2437 Call CharacterModel..ctor(..., isMaster=1, ...)
+# User 路径延迟执行时重查账号角色列表并直接解引用；Master 路径只查下载主数据皮肤缓存
+ISIL CharacterThumbnailLoader_LoadThumbnailFromUserDataAsync:389 FirstSafe(CharacterData predicate)
+ISIL CharacterThumbnailLoader_LoadThumbnailFromUserDataAsync:414/427 dereference CharacterData skin ids
+ISIL CharacterThumbnailLoader_LoadThumbnailFromMasterDataAsync:321 MRecordCache<MCharacterSkins,(Int64,Int32)>.Get
+ISIL LazyLoadThumbnail_FetchAsync:260 AsyncLazy<Sprite>.GetAwaiter
+
+## 未持有角色交流页 Tavern 皮肤映射接缝（Project.dll 代理元数据 + ISIL，2026-08-26）
+class Project.Master.NoaMessagePack.MCharacterSkins
+P Project.Master.NoaMessagePack.MCharacterSkins id : System.Int64
+P Project.Master.NoaMessagePack.MCharacterSkins m_character_id : System.Int64
+P Project.Master.NoaMessagePack.MCharacterSkins type : System.Int32
+P Project.Master.NoaMessagePack.MCharacterSkins is_default : System.Int32
+P Project.Master.NoaMessagePack.MCharacterSkins asset_id : System.String
+P Project.User.CharacterData _TavernMCharacterSkinId_k__BackingField : System.Int64
+# CharacterData.Apply(long) 选择 type=1/is_default=1 的默认皮肤，却不设置 Tavern 字段
+ISIL CharacterData.txt:1825-1860 GetCache<MCharacterSkins> + FirstSafe + AssetId/VoiceAssetId
+# 交流页直接把该字段传入 TavernUtility；工具按 MCharacterSkins.id 精确 FirstSafe
+ISIL AdventurerDetail_SubService_UpdateView_d__101.txt:1623 GetTavernAssetIdFromMSkinId(TavernMCharacterSkinId)
+ISIL TavernUtility.txt:3256-3287 FirstSafe(MCharacterSkins.id == tavernMCharacterSkinId) -> asset_id
+
+## 未持有角色 Tavern 卡片与工作皮肤配对接缝（Project.dll 代理元数据 + ISIL + 当前下载 Master，2026-08-26）
+class Project.Master.NoaMessagePack.MTavernCharacterCards
+P Project.Master.NoaMessagePack.MTavernCharacterCards id : System.Int64
+P Project.Master.NoaMessagePack.MTavernCharacterCards m_character_id : System.Int64
+P Project.Master.NoaMessagePack.MTavernCharacterCards m_character_skin_id : System.Int64
+# UpdateView 的卡片谓词只有角色 ID 与 Tavern 皮肤 ID 两项
+ISIL AdventurerDetail_SubService_DisplayClass101_0.txt:352 card.m_character_id == CharacterData.MCharaId
+ISIL AdventurerDetail_SubService_DisplayClass101_0.txt:389 card.m_character_skin_id == CharacterData.TavernMCharacterSkinId
+# 当前下载 MessagePack Master：68 个角色全部有卡片；69 条卡片全部引用现存皮肤
+CACHE m_tavern_character_cards characters=68 rows=69 missing_character=0 missing_skin=0
+CACHE card-backed skin distribution type=2,is_default=1:68; type=2,is_default=2:1
+CACHE character=1300014 ordinary_default_skin=130001401 tavern_default_skin=130001402
 """;
 }

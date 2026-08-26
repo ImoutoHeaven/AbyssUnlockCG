@@ -16,7 +16,7 @@ public class CgUnlockPlugin : BasePlugin
         PluginConfig.Initialize(this);
         PatchManager.Initialize();
 
-        Log.LogInfo($"[CGUnlock] 已加载。皮肤解锁绕过={PluginConfig.EnableSkinStoryUnlock.Value} / 好感度解锁绕过={PluginConfig.EnableCharacterStoryUnlock.Value} / 无视NTR屏蔽={PluginConfig.IgnoreNtrBlock.Value} / NovelRead伪造={PluginConfig.EnableNovelReadBypass.Value}");
+        Log.LogInfo($"[CGUnlock] 已加载。皮肤解锁绕过={PluginConfig.EnableSkinStoryUnlock.Value} / 好感度解锁绕过={PluginConfig.EnableCharacterStoryUnlock.Value} / 无视NTR屏蔽={PluginConfig.IgnoreNtrBlock.Value} / NovelRead伪造={PluginConfig.EnableNovelReadBypass.Value} / 未持有角色详情={PluginConfig.EnableUnownedCharacterDetail.Value} / NTR入口遮罩绕过={PluginConfig.EnableNtrSceneEntryBypass.Value}");
     }
 }
 
@@ -24,5 +24,5 @@ internal static class PluginInfo
 {
     internal const string PluginGuid = "com.abyss.cgunlock";
     internal const string PluginName = "AbyssCGUnlock";
-    internal const string PluginVersion = "0.2.0";
+    internal const string PluginVersion = "0.3.7";
 }
