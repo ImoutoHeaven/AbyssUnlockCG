@@ -10,7 +10,9 @@ using Project;
 using Project.CharacterDetail;
 using Project.Common;
 using Project.Master;
+using Project.Outgame;
 using Project.User;
+using Il2CppCancellationToken = Il2CppSystem.Threading.CancellationToken;
 
 namespace AbyssCGUnlock.Patches;
 
@@ -28,6 +30,7 @@ internal static class CharacterAbilityLocalViewPatch
     private static readonly HashSet<IntPtr> BlockedSkillViewPointers = new();
     private static readonly HashSet<IntPtr> OwnedSkillViewPointers = new();
     private static bool _loggedFirstMasterModel;
+    private static bool _loggedFirstProjectedPresentation;
     private static bool _loggedFirstReadOnlyView;
     private static bool _loggedFirstBlockedMutation;
 
@@ -104,6 +107,12 @@ internal static class CharacterAbilityLocalViewPatch
                 ? 1
                 : Math.Max(1, character.ParameterData.Lv);
 
+            LocalCharacterSkinRegistry.ApplySavedSelection(
+                userData,
+                character.MCharaId,
+                character,
+                dataStore);
+
             __result = CharacterDetailModel.CreateFromMaster(
                 dataStore,
                 character.MCharaId,
@@ -116,6 +125,43 @@ internal static class CharacterAbilityLocalViewPatch
                 CgUnlockPlugin.LogSource.LogWarning(
                     $"[CGUnlock] 未持有角色技能Master模型创建返回空，回退账号模型: id={character.MCharaId}");
                 return true;
+            }
+
+            var presentation = CharacterDetailPresentationPolicy.ResolveMasterReadOnly(
+                __result._AssetId_k__BackingField ?? string.Empty,
+                character._AssetId_k__BackingField ?? string.Empty);
+            __result._AssetId_k__BackingField = presentation.DetailAssetId;
+
+            if (presentation.UseProjectedCharacterData)
+            {
+                try
+                {
+                    character._AssetId_k__BackingField = presentation.CharacterModelAssetId;
+                    var projectedCharacterModel = CharacterModel.CreateFromMaster(
+                        character,
+                        AppDefine.IconSize.M,
+                        Il2CppCancellationToken.None);
+                    if (projectedCharacterModel != null)
+                    {
+                        __result._characterModel = projectedCharacterModel;
+                    }
+
+                    if (!_loggedFirstProjectedPresentation)
+                    {
+                        _loggedFirstProjectedPresentation = true;
+                        CgUnlockPlugin.LogSource.LogInfo(
+                            $"[CGUnlock] 未持有角色详情已恢复本地普通皮肤展示身份: " +
+                            $"first_id={character.MCharaId}, asset_id={presentation.DetailAssetId}");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    // The detail portrait/SD stand consumes CharacterDetailModel.AssetId directly;
+                    // keep that safe projection even if the auxiliary thumbnail model cannot rebuild.
+                    CgUnlockPlugin.LogSource.LogWarning(
+                        $"[CGUnlock] 未持有角色详情缩略模型皮肤投影失败，立绘/SD资源身份仍保留: " +
+                        $"id={character.MCharaId}, error={exception}");
+                }
             }
 
             if (!_loggedFirstMasterModel)

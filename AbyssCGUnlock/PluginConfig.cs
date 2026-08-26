@@ -34,6 +34,9 @@ internal static class PluginConfig
     /// <summary>绕过个人资料→其他→演出的本地前提条件。</summary>
     internal static ConfigEntry<bool> EnableProfileReplayUnlock = null!;
 
+    /// <summary>动态注册下载缓存角色皮肤，并在客户端本地换装和持久化。</summary>
+    internal static ConfigEntry<bool> EnableLocalCharacterSkinChange = null!;
+
     internal static void Initialize(BasePlugin plugin)
     {
         EnableSkinStoryUnlock = plugin.Config.Bind(
@@ -89,5 +92,11 @@ internal static class PluginConfig
             nameof(EnableProfileReplayUnlock),
             true,
             "本地解锁个人资料→其他→演出列表，无视羁绊及其他前提；只清除由 ProfileReplayListModel.Create 生成的演出模型锁定位，语音模型不受影响。");
+
+        EnableLocalCharacterSkinChange = plugin.Config.Bind(
+            "CharacterDetail",
+            nameof(EnableLocalCharacterSkinChange),
+            true,
+            "从下载 Master 缓存动态注册已发布角色皮肤；换装确认仅写入按账号与角色隔离的本地状态，并持久化到 BepInEx/cache/AbyssCGUnlock；同步立绘/SD 像素预览，不调用服务端换装 API。");
     }
 }

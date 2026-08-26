@@ -43,6 +43,14 @@ internal static class CharacterDetailLocalUnlockPatch
         }
 
         var userData = __instance._userData;
+        if (PluginConfig.EnableLocalCharacterSkinChange.Value)
+        {
+            LocalCharacterSkinRegistry.ApplySavedSelection(
+                userData,
+                tCharacterId,
+                __instance._masterDataStore);
+        }
+
         if (!LocalCharacterRegistry.TryGet(userData, tCharacterId, out var character) || character == null)
         {
             return;

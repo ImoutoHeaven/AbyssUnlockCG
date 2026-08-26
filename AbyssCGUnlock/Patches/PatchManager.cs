@@ -95,6 +95,31 @@ internal static class PatchManager
             ProfileReplayUnlockPatch.TargetMethod(),
             postfix: new HarmonyMethod(typeof(ProfileReplayUnlockPatch), nameof(ProfileReplayUnlockPatch.Postfix)));
 
-        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / InteractionMasterThumbnail / UnownedCharacterDetail / NtrSceneEntry / UnownedSkillMasterView / PersonalStoryUnlock / ProfileReplayUnlock");
+        _harmony.Patch(
+            SkinChangePopupLocalPatch.TargetInitializePopupMethod(),
+            prefix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PrefixInitializePopup)),
+            finalizer: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.FinalizeInitializePopup)));
+
+        _harmony.Patch(
+            SkinChangePopupLocalPatch.TargetCreateCharacterSkinModelsMethod(),
+            prefix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PrefixCreateCharacterSkinModels)),
+            postfix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PostfixCreateCharacterSkinModels)),
+            finalizer: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.FinalizeCreateCharacterSkinModels)));
+
+        _harmony.Patch(
+            SkinChangePopupLocalPatch.TargetCreateWeaponSkinModelsMethod(),
+            prefix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PrefixCreateWeaponSkinModels)),
+            postfix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PostfixCreateWeaponSkinModels)),
+            finalizer: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.FinalizeCreateWeaponSkinModels)));
+
+        _harmony.Patch(
+            SkinChangePopupLocalPatch.TargetConfirmSubscriptionMethod(),
+            prefix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PrefixConfirmSubscription)));
+
+        _harmony.Patch(
+            SkinChangePopupLocalPatch.TargetConfirmMethod(),
+            prefix: new HarmonyMethod(typeof(SkinChangePopupLocalPatch), nameof(SkinChangePopupLocalPatch.PrefixConfirm)));
+
+        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / InteractionMasterThumbnail / UnownedCharacterDetail / NtrSceneEntry / UnownedSkillMasterView / PersonalStoryUnlock / ProfileReplayUnlock / LocalCharacterSkinChange");
     }
 }

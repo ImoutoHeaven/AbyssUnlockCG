@@ -113,6 +113,11 @@ internal static class DynamicCharacterCatalog
             character._IsNew_k__BackingField = false;
             character._IsExistStory_k__BackingField = true;
             character._TavernMCharacterSkinId_k__BackingField = tavernSkinId;
+            LocalCharacterSkinRegistry.ApplySavedSelection(
+                userData,
+                selectedIds[i],
+                character,
+                masterDataStore);
             syntheticCharacters.Add(character);
 
             if (firstMappedSkinId == 0)
