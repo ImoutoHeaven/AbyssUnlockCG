@@ -1,0 +1,24 @@
+bin/
+obj/
+*.user
+*.log
+
+# 构建产物不入库（可由 docker 复现构建）
+release/**/*.dll
+release/**/*.pdb
+
+# 反编译大文件不入库（可用 evidence/tools/DumpTypes 与 Cpp2IL 重新生成）
+evidence/cpp2il/
+evidence/Project-src/
+evidence/Il2Cppmscorlib-src/
+evidence/dump/
+evidence/il2cppdump/
+evidence/GameAssembly/
+evidence/global-metadata.dat
+evidence/*.zip
+
+# 反编译工具二进制不入库（源码在 evidence/tools/DumpTypes，已在库内）
+evidence/tools/cpp2il/
+evidence/tools/cpp2il-cli/
+
+# 保留：evidence/fixtures/（测试夹具，小文本，来自新鲜反编译）
