@@ -25,6 +25,21 @@ public static class UnlockPolicy
     public static bool IsCharacterStoryUnlocked(int intimacyLevel, int conditionValue, bool bypassEnabled)
         => bypassEnabled || IsCharacterStoryUnlockedByGame(intimacyLevel, conditionValue);
 
+    /// <summary>
+    /// 最终寝室剧情展示状态。角色剧情和皮肤剧情使用各自的本地绕过开关，
+    /// 已由游戏解锁的条目不会因插件开关关闭而重新上锁。
+    /// </summary>
+    public static bool IsBedroomStoryUnlocked(
+        bool gameUnlocked,
+        bool isSkinStory,
+        bool characterBypassEnabled,
+        bool skinBypassEnabled)
+        => gameUnlocked || (isSkinStory ? skinBypassEnabled : characterBypassEnabled);
+
+    /// <summary>个人资料演出最终是否锁定；本地绕过只清除锁，不会制造新的锁。</summary>
+    public static bool IsProfileReplayLocked(bool gameLocked, bool bypassEnabled)
+        => gameLocked && !bypassEnabled;
+
     /// <summary>NTR 屏蔽块是否应显示：IsNtr 且未启用「无视屏蔽」。</summary>
     public static bool ShouldShowNtrBlock(bool isNtr, bool ignoreNtrBlockEnabled)
         => isNtr && !ignoreNtrBlockEnabled;

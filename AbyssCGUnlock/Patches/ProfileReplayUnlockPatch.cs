@@ -1,55 +1,48 @@
 using System.Reflection;
 using HarmonyLib;
 using Project.Interaction.ProfileMode;
-using Project.User;
-using ProfileReplayModelList = Il2CppSystem.Collections.Generic.List<Project.Interaction.ProfileMode.ProfileReplayListModel>;
+using Project.Master.NoaMessagePack;
 
 namespace AbyssCGUnlock.Patches;
 
 /// <summary>
-/// Clears only the client-side lock on Profile -> Other -> Performance entries for both owned and
-/// registry-backed unowned characters before the native controller copies and renders the supplied
-/// event list. Voice entries are intentionally untouched.
+/// Clears the client-side lock as each Profile -> Other -> Performance model is created.
+/// The profile initialization state machine writes the controller fields directly and does not call
+/// ProfileReplayViewController.UpdateView, so the model factory is the first stable shared seam for
+/// both owned and registry-backed unowned characters. Voice models use another overload and remain untouched.
 /// </summary>
 internal static class ProfileReplayUnlockPatch
 {
     internal static MethodBase TargetMethod()
     {
         return AccessTools.Method(
-            typeof(ProfileReplayViewController),
-            nameof(ProfileReplayViewController.UpdateView),
+            typeof(ProfileReplayListModel),
+            nameof(ProfileReplayListModel.Create),
             new[]
             {
-                typeof(ProfileReplayModelList),
-                typeof(ProfileReplayModelList),
-                typeof(CharacterData),
+                typeof(bool),
+                typeof(MNovelHomes),
+                typeof(EventType),
+                typeof(int),
             });
     }
 
-    internal static void Prefix(ProfileReplayModelList eventList)
+    internal static void Postfix(ProfileReplayListModel __result)
     {
-        if (!PluginConfig.EnableProfileReplayUnlock.Value || eventList == null)
+        if (__result == null)
         {
             return;
         }
 
-        var unlocked = 0;
-        for (var i = 0; i < eventList.Count; i++)
-        {
-            var model = eventList[i];
-            if (model == null || !model.IsLocked)
-            {
-                continue;
-            }
+        var wasLocked = __result._IsLocked_k__BackingField;
+        __result._IsLocked_k__BackingField = UnlockPolicy.IsProfileReplayLocked(
+            wasLocked,
+            PluginConfig.EnableProfileReplayUnlock.Value);
 
-            model.IsLocked = false;
-            unlocked++;
-        }
-
-        if (unlocked > 0)
+        if (wasLocked && !__result._IsLocked_k__BackingField)
         {
             CgUnlockPlugin.LogSource.LogInfo(
-                $"[CGUnlock] 角色个人资料演出已强制本地解锁(无视羁绊门槛): count={unlocked}");
+                $"[CGUnlock] 角色个人资料演出已强制本地解锁(无视羁绊门槛): event_type={__result.EventType}");
         }
     }
 }

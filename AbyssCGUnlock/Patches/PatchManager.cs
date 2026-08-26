@@ -22,6 +22,7 @@ internal static class PatchManager
 
         _harmony.Patch(
             NtrBlockDisplayPatch.TargetMethod(),
+            prefix: new HarmonyMethod(typeof(NtrBlockDisplayPatch), nameof(NtrBlockDisplayPatch.Prefix)),
             postfix: new HarmonyMethod(typeof(NtrBlockDisplayPatch), nameof(NtrBlockDisplayPatch.Postfix)));
 
         _harmony.Patch(
@@ -92,7 +93,7 @@ internal static class PatchManager
 
         _harmony.Patch(
             ProfileReplayUnlockPatch.TargetMethod(),
-            prefix: new HarmonyMethod(typeof(ProfileReplayUnlockPatch), nameof(ProfileReplayUnlockPatch.Prefix)));
+            postfix: new HarmonyMethod(typeof(ProfileReplayUnlockPatch), nameof(ProfileReplayUnlockPatch.Postfix)));
 
         CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / InteractionMasterThumbnail / UnownedCharacterDetail / NtrSceneEntry / UnownedSkillMasterView / PersonalStoryUnlock / ProfileReplayUnlock");
     }

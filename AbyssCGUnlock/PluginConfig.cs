@@ -88,6 +88,6 @@ internal static class PluginConfig
             "Interaction",
             nameof(EnableProfileReplayUnlock),
             true,
-            "本地解锁个人资料→其他→演出列表，无视羁绊及其他前提；只改写传给 ProfileReplayViewController 的 eventList 模型。");
+            "本地解锁个人资料→其他→演出列表，无视羁绊及其他前提；只清除由 ProfileReplayListModel.Create 生成的演出模型锁定位，语音模型不受影响。");
     }
 }
