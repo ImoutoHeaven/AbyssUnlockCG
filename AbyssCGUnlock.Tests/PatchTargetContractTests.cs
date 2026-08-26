@@ -89,6 +89,7 @@ public class PatchTargetContractTests
         Assert.DoesNotContain("CharacterTopThumbnailModelLocalUnlockPatch", src);
         Assert.Contains("CharacterDetailLocalUnlockPatch", src);
         Assert.Contains("CharacterDataStoreLocalLookupPatch", src);
+        Assert.Contains("InteractionThumbnailLocalUnlockPatch", src);
         Assert.DoesNotContain("MainCharacterDetailLocalUnlockPatch", src);
         Assert.Contains("NtrSceneEntryPatch", src);
     }

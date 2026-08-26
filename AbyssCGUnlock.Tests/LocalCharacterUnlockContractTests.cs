@@ -147,6 +147,34 @@ public class LocalCharacterUnlockContractTests
     }
 
     [Fact]
+    public void 未持有角色交流缩略图_账号目录命中时从UserData加载器改走同签名Master加载器()
+    {
+        var src = Read("AbyssCGUnlock/Patches/InteractionThumbnailLocalUnlockPatch.cs");
+        var manager = Read("AbyssCGUnlock/Patches/PatchManager.cs");
+
+        Assert.Contains("typeof(CharacterThumbnailLoader)", src);
+        Assert.Contains("nameof(CharacterThumbnailLoader.LoadThumbnailFromUserDataAsync)", src);
+        Assert.Contains("typeof(AppDefine.IconSize)", src);
+        Assert.Contains("typeof(long)", src);
+        Assert.Contains("typeof(SkinType)", src);
+        Assert.Contains("typeof(CacheType)", src);
+        Assert.Contains("CharacterThumbnailLoader __instance", src);
+        Assert.Contains("LocalCharacterRegistry.TryGet", src);
+        Assert.Contains("ref UniTask<Sprite> __result", src);
+        Assert.Contains("__result = __instance.LoadThumbnailFromMasterDataAsync(", src);
+        Assert.Contains("iconSize, mCharacterId, skinType, cacheType", src);
+        Assert.Contains("return false;", src);
+        Assert.Contains("未持有角色交流缩略图已切换到Master路径", src);
+        Assert.DoesNotContain("._dataList", src);
+        Assert.DoesNotContain(".Add(", src);
+        Assert.DoesNotContain(".Remove(", src);
+        Assert.DoesNotMatch(new Regex(@"\.\s*Request\w*\s*\(", RegexOptions.CultureInvariant), src);
+
+        Assert.Contains("InteractionThumbnailLocalUnlockPatch.TargetMethod()", manager);
+        Assert.Contains("nameof(InteractionThumbnailLocalUnlockPatch.Prefix)", manager);
+    }
+
+    [Fact]
     public void 主角色详情补丁注册_不得再生成复杂值类型的IL2CPP托管跳板()
     {
         var manager = Read("AbyssCGUnlock/Patches/PatchManager.cs");
@@ -187,6 +215,7 @@ public class LocalCharacterUnlockContractTests
             Read("AbyssCGUnlock/Patches/CharacterModelLocalUnlockPatch.cs"),
             Read("AbyssCGUnlock/Patches/CharacterDetailLocalUnlockPatch.cs"),
             Read("AbyssCGUnlock/Patches/CharacterDataStoreLocalLookupPatch.cs"),
+            Read("AbyssCGUnlock/Patches/InteractionThumbnailLocalUnlockPatch.cs"),
             Read("AbyssCGUnlock/Patches/NtrSceneEntryPatch.cs"));
 
         Assert.DoesNotMatch(new Regex(@"\b(?:Character|Interaction)\w*ApiDataStore\b", RegexOptions.CultureInvariant), src);
@@ -212,6 +241,7 @@ public class LocalCharacterUnlockContractTests
         Assert.DoesNotContain("CharacterTopThumbnailModelLocalUnlockPatch", manager);
         Assert.Contains("CharacterDetailLocalUnlockPatch", manager);
         Assert.Contains("CharacterDataStoreLocalLookupPatch", manager);
+        Assert.Contains("InteractionThumbnailLocalUnlockPatch", manager);
         Assert.DoesNotContain("MainCharacterDetailLocalUnlockPatch", manager);
         Assert.Contains("NtrSceneEntryPatch", manager);
     }
@@ -234,6 +264,9 @@ public class LocalCharacterUnlockContractTests
     [InlineData("CreateFromMaster(Project.User.CharacterData,Project.AppDefine+IconSize,Il2CppSystem.Threading.CancellationToken)")]
     [InlineData("Project.User.CharacterDataStore")]
     [InlineData("GetByTableId(System.Int64) -> Project.User.CharacterData")]
+    [InlineData("Project.ThumbnailLoader.CharacterThumbnailLoader")]
+    [InlineData("LoadThumbnailFromUserDataAsync(Project.AppDefine+IconSize,System.Int64,Project.Master.SkinType,Absf.CacheType)")]
+    [InlineData("LoadThumbnailFromMasterDataAsync(Project.AppDefine+IconSize,System.Int64,Project.Master.SkinType,Absf.CacheType)")]
     [InlineData("Project.Master.NoaMessagePack.MCharacters")]
     [InlineData("Project.Master.NoaMessagePack.MCharacterSkins")]
     [InlineData("Project.Master.NoaMessagePack.MTavernCharacterCards")]

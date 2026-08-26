@@ -142,5 +142,19 @@ ISIL AdventurerDetail_SubService_DisplayClass101_0.txt:389 card.m_character_skin
 CACHE m_tavern_character_cards characters=68 rows=69 missing_character=0 missing_skin=0
 CACHE card-backed skin distribution type=2,is_default=1:68; type=2,is_default=2:1
 CACHE character=1300014 ordinary_default_skin=130001401 tavern_default_skin=130001402
+
+## 未持有角色交流页缩略图加载接缝（Project.dll 代理源码 + ISIL + Player.log，2026-08-26）
+class Project.ThumbnailLoader.CharacterThumbnailLoader
+M Project.ThumbnailLoader.CharacterThumbnailLoader LoadThumbnailFromUserDataAsync(Project.AppDefine+IconSize,System.Int64,Project.Master.SkinType,Absf.CacheType) -> Cysharp.Threading.Tasks.UniTask`1[[UnityEngine.Sprite, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]
+M Project.ThumbnailLoader.CharacterThumbnailLoader LoadThumbnailFromMasterDataAsync(Project.AppDefine+IconSize,System.Int64,Project.Master.SkinType,Absf.CacheType) -> Cysharp.Threading.Tasks.UniTask`1[[UnityEngine.Sprite, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]
+# UserData 路径直接枚举 loader._characterDataStore 的账号角色列表，按 MCharaId FirstSafe
+ISIL CharacterThumbnailLoader_LoadThumbnailFromUserDataAsync:379-389 Func<CharacterData,bool> + FirstSafe
+ISIL CharacterThumbnailLoader_LoadThumbnailFromUserDataAsync:401-440 CharacterData skin id -> MCharacterSkins.Get
+# MasterData 路径不读取 CharacterData，直接按 (mCharacterId,skinType) 查 MCharacterSkins
+ISIL CharacterThumbnailLoader_LoadThumbnailFromMasterDataAsync:304-321 ValueTuple<Int64,Int32> -> MRecordCache.Get
+# 交流页模式切换和 CreateBg 都调用 UserData 路径；真实异常栈由 SwitchChara 进入该加载器
+ISIL AdventurerDetail.SubService.SwitchChara:2369 LoadThumbnailFromUserDataAsync
+ISIL AdventurerDetail.SubService.CreateBg:5008 LoadThumbnailFromUserDataAsync
+Player.log: FirstSafe -> CharacterThumbnailLoader.LoadThumbnailFromUserDataAsync -> AdventurerDetail.SubService.SwitchChara
 """;
 }

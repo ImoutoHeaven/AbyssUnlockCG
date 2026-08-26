@@ -60,10 +60,14 @@ internal static class PatchManager
             prefix: new HarmonyMethod(typeof(CharacterDataStoreLocalLookupPatch), nameof(CharacterDataStoreLocalLookupPatch.Prefix)));
 
         _harmony.Patch(
+            InteractionThumbnailLocalUnlockPatch.TargetMethod(),
+            prefix: new HarmonyMethod(typeof(InteractionThumbnailLocalUnlockPatch), nameof(InteractionThumbnailLocalUnlockPatch.Prefix)));
+
+        _harmony.Patch(
             NtrSceneEntryPatch.TargetMethod(),
             prefix: new HarmonyMethod(typeof(NtrSceneEntryPatch), nameof(NtrSceneEntryPatch.Prefix)),
             finalizer: new HarmonyMethod(typeof(NtrSceneEntryPatch), nameof(NtrSceneEntryPatch.Finalizer)));
 
-        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / UnownedCharacterDetail / NtrSceneEntry");
+        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / InteractionMasterThumbnail / UnownedCharacterDetail / NtrSceneEntry");
     }
 }

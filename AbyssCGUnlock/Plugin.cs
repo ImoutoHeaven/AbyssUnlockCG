@@ -24,5 +24,5 @@ internal static class PluginInfo
 {
     internal const string PluginGuid = "com.abyss.cgunlock";
     internal const string PluginName = "AbyssCGUnlock";
-    internal const string PluginVersion = "0.3.7";
+    internal const string PluginVersion = "0.3.8";
 }
