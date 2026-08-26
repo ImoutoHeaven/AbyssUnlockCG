@@ -6,6 +6,26 @@ namespace AbyssCGUnlock.Tests;
 public class LocalCharacterSkinSelectionTests
 {
     [Theory]
+    [InlineData(false, 130003503, 130003502, 130003503)]
+    [InlineData(true, 130003503, 130003502, 130003502)]
+    [InlineData(false, 0, 130003502, 0)]
+    [InlineData(true, 130003503, 0, 0)]
+    public void 未持有角色缩略图_按展示类型精确选择已缓存皮肤ID(
+        bool isTavern,
+        long battleSkinId,
+        long tavernSkinId,
+        long expectedSkinId)
+    {
+        var selection = new CharacterSkinSelection(battleSkinId, tavernSkinId);
+
+        var actual = CharacterThumbnailSelectionPolicy.ResolveExactSkinId(
+            selection,
+            isTavern);
+
+        Assert.Equal(expectedSkinId, actual);
+    }
+
+    [Theory]
     [InlineData("master_default", "session_paid", "session_paid", true)]
     [InlineData("master_default", "", "master_default", false)]
     public void 未持有详情Master只读模型_立绘与SD共同采用本地普通皮肤身份(

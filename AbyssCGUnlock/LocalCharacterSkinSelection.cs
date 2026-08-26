@@ -117,6 +117,20 @@ internal static class CharacterSkinPresentationPolicy
     }
 }
 
+internal static class CharacterThumbnailSelectionPolicy
+{
+    internal static long ResolveExactSkinId(
+        CharacterSkinSelection selection,
+        bool isTavern)
+    {
+        var skinId = isTavern
+            ? selection.TavernSkinId
+            : selection.BattleSkinId;
+
+        return skinId > 0 ? skinId : 0;
+    }
+}
+
 internal sealed class AccountScopedCharacterSkinSelections<TAccountKey>
     where TAccountKey : notnull
 {

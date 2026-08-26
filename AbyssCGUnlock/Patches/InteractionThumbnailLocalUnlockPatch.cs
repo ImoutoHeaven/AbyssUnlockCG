@@ -16,11 +16,13 @@ namespace AbyssCGUnlock.Patches;
 /// <summary>
 /// Redirects Interaction-page thumbnails for account-scoped synthetic unowned characters to the
 /// downloaded Master cache. The native user-data loader enumerates its captured owned-character
-/// list with FirstSafe, so CharacterDataStore.GetByTableId patches cannot service this lookup.
+/// list with FirstSafe, so CharacterDataStore.GetByTableId patches cannot service this lookup. A
+/// saved local selection is routed by exact skin id rather than the character's default skin type.
 /// </summary>
 internal static class InteractionThumbnailLocalUnlockPatch
 {
     private static bool _loggedFirstRedirect;
+    private static bool _loggedFirstExactFallback;
 
     internal static MethodBase TargetMethod()
     {
@@ -60,14 +62,50 @@ internal static class InteractionThumbnailLocalUnlockPatch
                 return true;
             }
 
-            __result = __instance.LoadThumbnailFromMasterDataAsync(
-                iconSize, mCharacterId, skinType, cacheType);
+            var exactSkinId = 0L;
+            try
+            {
+                var selection = LocalCharacterSkinRegistry.TryGet(
+                    userData,
+                    mCharacterId,
+                    out var savedSelection)
+                    ? savedSelection
+                    : new CharacterSkinSelection(
+                        character._BattleMCharacterSkinId_k__BackingField,
+                        character._TavernMCharacterSkinId_k__BackingField);
+                exactSkinId = CharacterThumbnailSelectionPolicy.ResolveExactSkinId(
+                    selection,
+                    skinType == SkinType.TavernWork);
+                __result = exactSkinId > 0
+                    ? __instance.LoadThumbnailBySkinIdAsync(iconSize, exactSkinId, cacheType)
+                    : __instance.LoadThumbnailFromMasterDataAsync(
+                        iconSize,
+                        mCharacterId,
+                        skinType,
+                        cacheType);
+            }
+            catch (Exception exception)
+            {
+                if (!_loggedFirstExactFallback)
+                {
+                    _loggedFirstExactFallback = true;
+                    CgUnlockPlugin.LogSource.LogWarning(
+                        $"[CGUnlock] 未持有角色交流精确皮肤缩略图改道失败，回退Master默认路径: id={mCharacterId}, skin_id={exactSkinId}, error={exception}");
+                }
+
+                __result = __instance.LoadThumbnailFromMasterDataAsync(
+                    iconSize,
+                    mCharacterId,
+                    skinType,
+                    cacheType);
+                exactSkinId = 0;
+            }
 
             if (!_loggedFirstRedirect)
             {
                 _loggedFirstRedirect = true;
                 CgUnlockPlugin.LogSource.LogInfo(
-                    $"[CGUnlock] 未持有角色交流缩略图已切换到Master路径: first_id={mCharacterId}, skin_type={skinType}");
+                    $"[CGUnlock] 未持有角色交流缩略图已切换到精确皮肤路径: first_id={mCharacterId}, skin_type={skinType}, skin_id={exactSkinId}");
             }
 
             return false;
