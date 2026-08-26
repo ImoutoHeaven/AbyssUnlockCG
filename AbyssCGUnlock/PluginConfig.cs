@@ -25,6 +25,15 @@ internal static class PluginConfig
     /// <summary>绕过工作用服装入口的本地酒馆登记（低好感度）遮罩。</summary>
     internal static ConfigEntry<bool> EnableNtrSceneEntryBypass = null!;
 
+    /// <summary>未持有角色技能从下载 Master 只读渲染，升级/重置入口保持禁用。</summary>
+    internal static ConfigEntry<bool> EnableUnownedCharacterSkillView = null!;
+
+    /// <summary>绕过三个普通个人剧情的羁绊等级门槛。</summary>
+    internal static ConfigEntry<bool> EnablePersonalStoryUnlock = null!;
+
+    /// <summary>绕过个人资料→其他→演出的本地前提条件。</summary>
+    internal static ConfigEntry<bool> EnableProfileReplayUnlock = null!;
+
     internal static void Initialize(BasePlugin plugin)
     {
         EnableSkinStoryUnlock = plugin.Config.Bind(
@@ -55,12 +64,30 @@ internal static class PluginConfig
             "CharacterDetail",
             nameof(EnableUnownedCharacterDetail),
             true,
-            "允许进入游戏当前动态未持有角色列表中的角色详情，并只在 UpdateView 同步解析期间临时注入本地 CharacterData；不修改技能、突破或服务端持有状态。");
+            "允许进入游戏当前动态未持有角色列表中的角色详情，并只在 UpdateView 同步解析期间临时注入本地 CharacterData；不修改突破或服务端持有状态。");
 
         EnableNtrSceneEntryBypass = plugin.Config.Bind(
             "CharacterDetail",
             nameof(EnableNtrSceneEntryBypass),
             true,
             "绕过角色详情→交流→工作用服装的本地酒馆登记遮罩；只在原生切换回调执行期间临时置位并立即恢复，不发送请求。");
+
+        EnableUnownedCharacterSkillView = plugin.Config.Bind(
+            "CharacterDetail",
+            nameof(EnableUnownedCharacterSkillView),
+            true,
+            "未持有角色的技能/能力改用下载 Master 数据渲染图标与说明；升级、解锁、加减级和重置按钮全部禁用，不发送请求。");
+
+        EnablePersonalStoryUnlock = plugin.Config.Bind(
+            "Interaction",
+            nameof(EnablePersonalStoryUnlock),
+            true,
+            "本地解锁交流页的三个普通个人剧情，无视羁绊 1/5/15 门槛；只改写 StoryListThumbnailModel 的客户端显示门控。为保证纯本地播放，仅在 EnableNovelReadBypass 同时启用时生效。");
+
+        EnableProfileReplayUnlock = plugin.Config.Bind(
+            "Interaction",
+            nameof(EnableProfileReplayUnlock),
+            true,
+            "本地解锁个人资料→其他→演出列表，无视羁绊及其他前提；只改写传给 ProfileReplayViewController 的 eventList 模型。");
     }
 }

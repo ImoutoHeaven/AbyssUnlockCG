@@ -68,6 +68,32 @@ internal static class PatchManager
             prefix: new HarmonyMethod(typeof(NtrSceneEntryPatch), nameof(NtrSceneEntryPatch.Prefix)),
             finalizer: new HarmonyMethod(typeof(NtrSceneEntryPatch), nameof(NtrSceneEntryPatch.Finalizer)));
 
-        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / InteractionMasterThumbnail / UnownedCharacterDetail / NtrSceneEntry");
+        _harmony.Patch(
+            CharacterAbilityLocalViewPatch.TargetModelFactoryMethod(),
+            prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixModelFactory)),
+            postfix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PostfixModelFactory)));
+
+        _harmony.Patch(
+            CharacterAbilityLocalViewPatch.TargetReadOnlyViewMethod(),
+            prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixRestoreTrackedButtons)),
+            postfix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PostfixReadOnlyView)));
+
+        _harmony.Patch(
+            CharacterAbilityLocalViewPatch.TargetAbilityUpCommandMethod(),
+            prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixAbilityUpCommand)));
+
+        _harmony.Patch(
+            CharacterAbilityLocalViewPatch.TargetUnlockCommandMethod(),
+            prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixUnlockCommand)));
+
+        _harmony.Patch(
+            PersonalStoryUnlockPatch.TargetMethod(),
+            prefix: new HarmonyMethod(typeof(PersonalStoryUnlockPatch), nameof(PersonalStoryUnlockPatch.Prefix)));
+
+        _harmony.Patch(
+            ProfileReplayUnlockPatch.TargetMethod(),
+            prefix: new HarmonyMethod(typeof(ProfileReplayUnlockPatch), nameof(ProfileReplayUnlockPatch.Prefix)));
+
+        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] 补丁注册完成：StoryListUnlock / NtrBlockDisplay / NovelReadBypass / CharacterTopRefreshStateMachine / CharacterModelMasterThumbnail / CharacterDataStoreLocalLookup / InteractionMasterThumbnail / UnownedCharacterDetail / NtrSceneEntry / UnownedSkillMasterView / PersonalStoryUnlock / ProfileReplayUnlock");
     }
 }

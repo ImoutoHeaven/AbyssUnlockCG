@@ -143,6 +143,44 @@ CACHE m_tavern_character_cards characters=68 rows=69 missing_character=0 missing
 CACHE card-backed skin distribution type=2,is_default=1:68; type=2,is_default=2:1
 CACHE character=1300014 ordinary_default_skin=130001401 tavern_default_skin=130001402
 
+## 未持有角色只读技能、普通个人剧情、个人资料演出接缝（代理源码 + ISIL，2026-08-26）
+M Project.Common.CharacterDetailModel	CreateFromUserData(Project.Master.MasterDataStore,Project.User.CharacterData) -> Project.Common.CharacterDetailModel
+M Project.Common.CharacterDetailModel	CreateFromMaster(Project.Master.MasterDataStore,System.Int64,System.Int32,System.Int32,System.Boolean) -> Project.Common.CharacterDetailModel
+P Project.User.CharacterData	ParameterData : Project.User.CharacterParameterData
+P Project.User.CharacterParameterData	Lv : System.Int32
+P Project.User.CharacterData	LimitBreakCount : System.Int32
+# UserData 工厂从账号能力记录建模；Master 工厂只按角色 Master、突破与只读技能等级建模
+ISIL CharacterDetailModel.txt:1567 CharacterAbilityModel.CreateByTableId(masterDataStore,userData,character.Id,token)
+ISIL CharacterDetailModel.txt:1843 CharacterAbilityModel.CreateByMasterId(masterDataStore,character.MCharaId,character.LimitBreakCount,isMaxAbilityLv,token)
+ISIL CharacterDetailModel.txt:1837 SkillDescriptionModel.CreateModel(mCharacter.id,limitBreakCount,isMaxAbilityLv)
+P Project.Outgame.AbilityModel	LoadThumbnail : Project.Outgame.LazyLoadThumbnail
+M Project.Outgame.AbilityModel	GetDescription() -> System.String
+M Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService	UpdateView(Project.Common.CharacterDetailModel) -> System.Void
+P Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService	_abilityUpButton : Project.AppButton
+P Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService	_resetButton : Project.AppButton
+P Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService	_abilityUpInformationViewList : Il2CppSystem.Collections.Generic.List<Project.CharacterDetail.CharacterAbilityUpInformationView>
+P Project.CharacterDetail.CharacterAbilityUpInformationView	_unlockButton : Project.AppButton
+P Project.CharacterDetail.CharacterAbilityUpInformationView	_fluctuationButtonGroup : Project.Outgame.FluctuationButtonGroup
+M Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService+__c	_InitializeViewAsync_b__15_1(UniRx.Unit,Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService) -> System.Void
+M Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService+__c__DisplayClass33_0	_OpenUnlockConfirmPopupAsync_b__0() -> System.Void
+# 同步点击闭包仅启动升级/解锁异步流程；在这里 return false 可在进入 UniTask/RequestAsync 前拦截
+ISIL CharacterAbilityUpInfoBoxViewService_NestedType___c.txt:1005-1020 _InitializeViewAsync_b__15_1 -> OpenEnhanceConfirmPopupAsync state machine -> Forget
+ISIL CharacterAbilityUpInfoBoxViewService_NestedType___c__DisplayClass33_0.txt _OpenUnlockConfirmPopupAsync_b__0 -> UnlockAbilityAsync path
+M Project.Interaction.AdventurerDetail.StoryListThumbnail	UpdateView(Project.Interaction.AdventurerDetail.StoryListThumbnailModel,System.Int32) -> System.Void
+P Project.Interaction.AdventurerDetail.StoryListThumbnailModel	_IsExistStory_k__BackingField : System.Boolean
+# 普通 StoryListViewController 使用 StoryListThumbnail；R18StoryListViewController 使用独立的 StoryListPictThumbnail
+M Project.Interaction.AdventurerDetail.StoryListViewController	UpdateListView(Il2CppSystem.Collections.Generic.IEnumerable<MNovelCharacters>,System.Int32) -> System.Void
+# 普通个人剧情由 MNovelCharacters 动态 condition_value 与当前羁绊比较构造，不依赖硬编码 1/5/15 列表
+ISIL StoryListViewController_NestedType___c__DisplayClass9_0.txt:92-107 intimacyLevel >= condition_value -> StoryListThumbnailModel.IsExistStory
+ISIL AdventurerDetail.SubService.txt:115 OpenConfirmEventStoryPopupAsync(same StoryListThumbnailModel)
+M Project.Interaction.ProfileMode.ProfileReplayViewController	UpdateView(Il2CppSystem.Collections.Generic.List<ProfileReplayListModel>,Il2CppSystem.Collections.Generic.List<ProfileReplayListModel>,Project.User.CharacterData) -> System.Void
+P Project.Interaction.ProfileMode.ProfileReplayListModel	IsLocked : System.Boolean
+# eventList 在 CreateList 前保存；点击只依据 IsLocked 分流到本地演出或锁定提示
+ISIL ProfileReplayViewController.txt:641,665 UpdateView eventList -> this._eventList -> CreateList
+ISIL ProfileReplayViewController.txt:1192 voiceList.Concat(this._eventList)
+ISIL ProfileReplayViewController_NestedType___c__DisplayClass15_0.txt:437-816 IsLocked=false -> OpenNovelPopup/Prize/Cast; IsLocked=true -> OpenHint
+PROXY/ISIL ProfileReplayViewController contains no ApiDataStore.RequestAsync
+
 ## 未持有角色交流页缩略图加载接缝（Project.dll 代理源码 + ISIL + Player.log，2026-08-26）
 class Project.ThumbnailLoader.CharacterThumbnailLoader
 M Project.ThumbnailLoader.CharacterThumbnailLoader LoadThumbnailFromUserDataAsync(Project.AppDefine+IconSize,System.Int64,Project.Master.SkinType,Absf.CacheType) -> Cysharp.Threading.Tasks.UniTask`1[[UnityEngine.Sprite, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]
