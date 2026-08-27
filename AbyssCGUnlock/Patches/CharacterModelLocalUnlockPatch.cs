@@ -44,7 +44,9 @@ internal static class CharacterModelLocalUnlockPatch
         Il2CppCancellationToken ct,
         ref CharacterModel? __result)
     {
-        if (!PluginConfig.EnableUnownedCharacterDetail.Value)
+        var enableUnownedCharacterDetail = PluginConfig.EnableUnownedCharacterDetail.Value;
+        var enableLocalCharacterSkinChange = PluginConfig.EnableLocalCharacterSkinChange.Value;
+        if (!enableUnownedCharacterDetail && !enableLocalCharacterSkinChange)
         {
             return true;
         }
@@ -52,7 +54,17 @@ internal static class CharacterModelLocalUnlockPatch
         try
         {
             var userData = Engine.Get<UserData>();
-            if (userData == null ||
+            if (userData == null)
+            {
+                return true;
+            }
+
+            if (enableLocalCharacterSkinChange)
+            {
+                LocalCharacterSkinRegistry.ApplySavedSelection(userData, tCharacterId);
+            }
+
+            if (!enableUnownedCharacterDetail ||
                 !LocalCharacterRegistry.TryGet(userData, tCharacterId, out var character) ||
                 character == null)
             {

@@ -68,6 +68,20 @@ internal readonly struct CharacterDetailPresentationPlan
     internal bool UseProjectedCharacterData { get; }
 }
 
+internal readonly struct CharacterSkinRestartRestorePlan
+{
+    internal CharacterSkinRestartRestorePlan(
+        CharacterSkinSelection selection,
+        string assetId)
+    {
+        Selection = selection;
+        AssetId = assetId;
+    }
+
+    internal CharacterSkinSelection Selection { get; }
+    internal string AssetId { get; }
+}
+
 internal static class CharacterDetailPresentationPolicy
 {
     internal static CharacterDetailPresentationPlan ResolveMasterReadOnly(
@@ -117,6 +131,32 @@ internal static class CharacterSkinPresentationPolicy
     }
 }
 
+internal static class CharacterSkinRestartRestorePolicy
+{
+    internal static CharacterSkinRestartRestorePlan Resolve(
+        long characterId,
+        CharacterSkinSelection current,
+        string currentAssetId,
+        CharacterSkinSelection persisted,
+        IEnumerable<CharacterSkinPresentationCandidate> candidates)
+    {
+        var restored = new CharacterSkinSelection(
+            persisted.BattleSkinId > 0
+                ? persisted.BattleSkinId
+                : current.BattleSkinId,
+            persisted.TavernSkinId > 0
+                ? persisted.TavernSkinId
+                : current.TavernSkinId);
+        var restoredAssetId = CharacterSkinPresentationPolicy.ResolveBattleAssetId(
+            characterId,
+            restored.BattleSkinId,
+            currentAssetId ?? string.Empty,
+            candidates);
+
+        return new CharacterSkinRestartRestorePlan(restored, restoredAssetId);
+    }
+}
+
 internal static class CharacterThumbnailSelectionPolicy
 {
     internal static long ResolveExactSkinId(
@@ -128,6 +168,37 @@ internal static class CharacterThumbnailSelectionPolicy
             : selection.BattleSkinId;
 
         return skinId > 0 ? skinId : 0;
+    }
+}
+
+internal readonly struct CharacterThumbnailFirstRenderPlan
+{
+    internal CharacterThumbnailFirstRenderPlan(long skinId)
+    {
+        SkinId = skinId;
+    }
+
+    internal long SkinId { get; }
+    internal bool UseExactSkinId => SkinId > 0;
+}
+
+internal static class CharacterThumbnailFirstRenderPolicy
+{
+    internal static CharacterThumbnailFirstRenderPlan Resolve(
+        bool localSkinChangeEnabled,
+        bool hasSavedSelection,
+        CharacterSkinSelection savedSelection,
+        bool isTavern)
+    {
+        if (!localSkinChangeEnabled || !hasSavedSelection)
+        {
+            return default;
+        }
+
+        return new CharacterThumbnailFirstRenderPlan(
+            CharacterThumbnailSelectionPolicy.ResolveExactSkinId(
+                savedSelection,
+                isTavern));
     }
 }
 

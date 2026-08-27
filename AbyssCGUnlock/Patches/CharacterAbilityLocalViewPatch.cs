@@ -76,16 +76,36 @@ internal static class CharacterAbilityLocalViewPatch
         // only after positively matching the exact CharacterData object in the account-owned list.
         __state = PluginConfig.EnableUnownedCharacterSkillView.Value && character != null;
 
-        if (!PluginConfig.EnableUnownedCharacterSkillView.Value ||
-            dataStore == null ||
-            character == null)
+        if (character == null)
+        {
+            return true;
+        }
+
+        UserData? userData = null;
+        try
+        {
+            userData = Engine.Get<UserData>();
+            if (PluginConfig.EnableLocalCharacterSkinChange.Value)
+            {
+                LocalCharacterSkinRegistry.ApplySavedSelection(
+                    userData,
+                    character.MCharaId,
+                    character,
+                    dataStore);
+            }
+        }
+        catch
+        {
+            // Skin persistence is presentation-only; native detail construction remains available.
+        }
+
+        if (!PluginConfig.EnableUnownedCharacterSkillView.Value || dataStore == null)
         {
             return true;
         }
 
         try
         {
-            var userData = Engine.Get<UserData>();
             var isRegistryCharacter = userData != null &&
                 LocalCharacterRegistry.TryGet(userData, character.MCharaId, out var registered) &&
                 registered != null &&
@@ -106,12 +126,6 @@ internal static class CharacterAbilityLocalViewPatch
             var level = character.ParameterData == null
                 ? 1
                 : Math.Max(1, character.ParameterData.Lv);
-
-            LocalCharacterSkinRegistry.ApplySavedSelection(
-                userData,
-                character.MCharaId,
-                character,
-                dataStore);
 
             __result = CharacterDetailModel.CreateFromMaster(
                 dataStore,

@@ -194,46 +194,55 @@ internal static class LocalCharacterSkinRegistry
         CharacterSkinSelection selection,
         MasterDataStore? masterDataStore)
     {
-        character._BattleMCharacterSkinId_k__BackingField = selection.BattleSkinId;
-        character._TavernMCharacterSkinId_k__BackingField = selection.TavernSkinId;
+        var current = new CharacterSkinSelection(
+            character._BattleMCharacterSkinId_k__BackingField,
+            character._TavernMCharacterSkinId_k__BackingField);
+        var plan = CharacterSkinRestartRestorePolicy.Resolve(
+            characterId,
+            current,
+            character._AssetId_k__BackingField ?? string.Empty,
+            selection,
+            Array.Empty<CharacterSkinPresentationCandidate>());
 
         try
         {
             var masterSkins = (masterDataStore ?? Engine.Get<MasterDataStore>())?
                 .GetCache<MCharacterSkins>();
-            if (masterSkins == null)
+            if (masterSkins != null)
             {
-                return;
-            }
-
-            var candidates = new List<CharacterSkinPresentationCandidate>(masterSkins.Length);
-            for (var i = 0; i < masterSkins.Length; i++)
-            {
-                var masterSkin = masterSkins[i];
-                if (masterSkin == null || masterSkin.m_character_id != characterId)
+                var candidates = new List<CharacterSkinPresentationCandidate>(masterSkins.Length);
+                for (var i = 0; i < masterSkins.Length; i++)
                 {
-                    continue;
+                    var masterSkin = masterSkins[i];
+                    if (masterSkin == null || masterSkin.m_character_id != characterId)
+                    {
+                        continue;
+                    }
+
+                    candidates.Add(new CharacterSkinPresentationCandidate(
+                        masterSkin.id,
+                        masterSkin.m_character_id,
+                        masterSkin.type,
+                        masterSkin.asset_id ?? string.Empty));
                 }
 
-                candidates.Add(new CharacterSkinPresentationCandidate(
-                    masterSkin.id,
-                    masterSkin.m_character_id,
-                    masterSkin.type,
-                    masterSkin.asset_id ?? string.Empty));
-            }
-
-            character._AssetId_k__BackingField =
-                CharacterSkinPresentationPolicy.ResolveBattleAssetId(
+                plan = CharacterSkinRestartRestorePolicy.Resolve(
                     characterId,
-                    selection.BattleSkinId,
+                    current,
                     character._AssetId_k__BackingField ?? string.Empty,
+                    selection,
                     candidates);
+            }
         }
         catch
         {
             // The skin IDs remain process-local even if MasterDataStore is between lifecycle states.
             // A later detail/popup refresh reapplies the same selection and presentation projection.
         }
+
+        character._BattleMCharacterSkinId_k__BackingField = plan.Selection.BattleSkinId;
+        character._TavernMCharacterSkinId_k__BackingField = plan.Selection.TavernSkinId;
+        character._AssetId_k__BackingField = plan.AssetId;
     }
 
     private static bool TryFindCharacter(

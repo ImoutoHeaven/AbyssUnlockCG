@@ -61,8 +61,12 @@ internal static class PatchManager
             prefix: new HarmonyMethod(typeof(CharacterDataStoreLocalLookupPatch), nameof(CharacterDataStoreLocalLookupPatch.Prefix)));
 
         _harmony.Patch(
-            InteractionThumbnailLocalUnlockPatch.TargetMethod(),
-            prefix: new HarmonyMethod(typeof(InteractionThumbnailLocalUnlockPatch), nameof(InteractionThumbnailLocalUnlockPatch.Prefix)));
+            InteractionThumbnailLocalUnlockPatch.TargetUserDataMethod(),
+            prefix: new HarmonyMethod(typeof(InteractionThumbnailLocalUnlockPatch), nameof(InteractionThumbnailLocalUnlockPatch.PrefixUserData)));
+
+        _harmony.Patch(
+            InteractionThumbnailLocalUnlockPatch.TargetMasterDataMethod(),
+            prefix: new HarmonyMethod(typeof(InteractionThumbnailLocalUnlockPatch), nameof(InteractionThumbnailLocalUnlockPatch.PrefixMasterData)));
 
         _harmony.Patch(
             NtrSceneEntryPatch.TargetMethod(),
