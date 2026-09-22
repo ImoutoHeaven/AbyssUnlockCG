@@ -4,18 +4,16 @@ using System.Collections.Generic;
 namespace AbyssCGUnlock;
 
 /// <summary>
-/// Pure selection policy for the current master-cache/account snapshot.
-/// The key is a master character ID and the value records whether it is open at server time.
+/// Pure selection for one master-cache and account snapshot.
+/// The public client list is not consulted: open_at does not remove a candidate.
 /// </summary>
 internal static class DynamicUnownedCharacterSelector
 {
-    internal static IReadOnlyList<long> Select(
-        IEnumerable<KeyValuePair<long, bool>> candidates,
-        ISet<long> ownedMasterIds)
+    internal static IReadOnlyList<long> Select(IEnumerable<long> candidateIds, ISet<long> ownedMasterIds)
     {
-        if (candidates == null)
+        if (candidateIds == null)
         {
-            throw new ArgumentNullException(nameof(candidates));
+            throw new ArgumentNullException(nameof(candidateIds));
         }
 
         if (ownedMasterIds == null)
@@ -26,16 +24,27 @@ internal static class DynamicUnownedCharacterSelector
         var selected = new List<long>();
         var seen = new HashSet<long>();
 
-        foreach (var candidate in candidates)
+        foreach (var candidateId in candidateIds)
         {
-            if (!candidate.Value || ownedMasterIds.Contains(candidate.Key) || !seen.Add(candidate.Key))
+            if (ownedMasterIds.Contains(candidateId) || !seen.Add(candidateId))
             {
                 continue;
             }
 
-            selected.Add(candidate.Key);
+            selected.Add(candidateId);
         }
 
         return selected;
     }
+
+    /// <summary>
+    /// Records required before CreateFromMaster and AdventurerDetail.UpdateView.
+    /// ponytail: this is the master-row gate, not a check that addressable bundles are on disk.
+    /// </summary>
+    internal static bool CanLocallyUnlock(
+        bool hasUnionType,
+        bool hasDefaultBattleSkinAsset,
+        bool hasProfile,
+        bool hasTavernWorkSkin)
+        => hasUnionType && hasDefaultBattleSkinAsset && hasProfile && hasTavernWorkSkin;
 }

@@ -6,8 +6,8 @@ using CharacterListSubService = Project.Interaction.CharacterList.SubService;
 namespace AbyssCGUnlock.Patches;
 
 /// <summary>
-/// Refreshes the local registry from the game's current dynamic unowned-character list.
-/// The list is produced from the downloaded MCharacters cache and current account ownership.
+/// Replaces the local registry from the downloaded master cache, including characters the client public list hides.
+/// Copying _nonHasCharaDataList would drop rows hidden by open_at.
 /// </summary>
 internal static class CharacterCatalogCapturePatch
 {
@@ -31,7 +31,7 @@ internal static class CharacterCatalogCapturePatch
             return;
         }
 
-        var count = LocalCharacterRegistry.Replace(__instance._userData, __instance._nonHasCharaDataList);
+        var count = DynamicCharacterCatalog.Refresh(__instance._userData).Count;
         CgUnlockPlugin.LogSource.LogDebug($"[CGUnlock] 当前账号动态未持有角色目录已替换: count={count}");
     }
 }

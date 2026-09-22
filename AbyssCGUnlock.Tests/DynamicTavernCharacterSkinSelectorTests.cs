@@ -79,4 +79,23 @@ public class DynamicTavernCharacterSkinSelectorTests
 
         Assert.Equal(futureSkinId, selected[futureCharacterId]);
     }
+
+    [Fact]
+    public void 没有type2默认皮肤时使用卡片实际引用且存在的皮肤()
+    {
+        var selected = Select(
+            new[]
+            {
+                (SkinId: 1001L, CharacterId: 101L, Type: 1, IsDefault: 1),
+                (SkinId: 2001L, CharacterId: 202L, Type: 2, IsDefault: 0),
+            },
+            new[]
+            {
+                (CharacterId: 101L, SkinId: 1001L),
+                (CharacterId: 202L, SkinId: 2999L),
+            });
+
+        Assert.Equal(1001L, selected[101L]);
+        Assert.False(selected.ContainsKey(202L));
+    }
 }

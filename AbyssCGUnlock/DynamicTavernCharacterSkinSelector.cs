@@ -27,11 +27,18 @@ internal static class DynamicTavernCharacterSkinSelector
             throw new ArgumentNullException(nameof(tavernCardPairs));
         }
 
-        var cardBackedPairs = new HashSet<(long CharacterId, long SkinId)>(tavernCardPairs);
+        var pairs = new List<(long CharacterId, long SkinId)>(tavernCardPairs);
+        var cardBackedPairs = new HashSet<(long CharacterId, long SkinId)>(pairs);
+        var skinOwner = new Dictionary<long, long>();
         var selected = new Dictionary<long, long>();
 
         foreach (var skin in skins)
         {
+            if (!skinOwner.ContainsKey(skin.SkinId))
+            {
+                skinOwner.Add(skin.SkinId, skin.CharacterId);
+            }
+
             if (skin.Type != TavernSkinType ||
                 skin.IsDefault != DefaultFlag ||
                 !cardBackedPairs.Contains((skin.CharacterId, skin.SkinId)) ||
@@ -41,6 +48,19 @@ internal static class DynamicTavernCharacterSkinSelector
             }
 
             selected.Add(skin.CharacterId, skin.SkinId);
+        }
+
+        // A future card may not use the type-2 default. The detail page matches the card row, not the type.
+        foreach (var pair in pairs)
+        {
+            if (selected.ContainsKey(pair.CharacterId) ||
+                !skinOwner.TryGetValue(pair.SkinId, out var owner) ||
+                owner != pair.CharacterId)
+            {
+                continue;
+            }
+
+            selected.Add(pair.CharacterId, pair.SkinId);
         }
 
         return selected;
