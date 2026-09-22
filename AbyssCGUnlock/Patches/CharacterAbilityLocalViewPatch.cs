@@ -19,8 +19,9 @@ namespace AbyssCGUnlock.Patches;
 /// <summary>
 /// Builds the skill/ability portion of a dynamically discovered unowned character from downloaded
 /// Master data. The native user-data factory expects account-owned ability rows and therefore
-/// produces an empty skill tab for registry-backed characters. All mutation controls are disabled
-/// after the native view renders, leaving icons and descriptions available as a read-only preview.
+/// produces an empty skill tab for registry-backed characters. Mutation controls stay disabled
+/// after the native view renders except the per-row plus and minus buttons, which only change
+/// the local expected level preview.
 /// </summary>
 internal static class CharacterAbilityLocalViewPatch
 {
@@ -65,6 +66,24 @@ internal static class CharacterAbilityLocalViewPatch
             nameof(CharacterAbilityUpInfoBoxViewService.__c__DisplayClass33_0._OpenUnlockConfirmPopupAsync_b__0),
             Type.EmptyTypes);
     }
+
+    internal static MethodBase TargetExpectedAbilityMethod()
+    {
+        return AccessTools.Method(
+            typeof(CharacterAbilityUpSimulator),
+            nameof(CharacterAbilityUpSimulator.CreateExpectedAbilityModel));
+    }
+
+    internal static MethodBase TargetInformationViewMethod()
+    {
+        return AccessTools.Method(
+            typeof(CharacterAbilityUpInformationView),
+            nameof(CharacterAbilityUpInformationView.UpdateView),
+            new[] { typeof(AbilityModel), typeof(AbilityModel) });
+    }
+
+    internal static long ResolveLocalAbilityTableId(long tableId, long masterId)
+        => tableId != 0 ? tableId : masterId;
 
     internal static bool PrefixModelFactory(
         MasterDataStore dataStore,
@@ -177,6 +196,8 @@ internal static class CharacterAbilityLocalViewPatch
                         $"id={character.MCharaId}, error={exception}");
                 }
             }
+
+            StampUnownedAbilityTableIds(__result);
 
             if (!_loggedFirstMasterModel)
             {
@@ -317,11 +338,107 @@ internal static class CharacterAbilityLocalViewPatch
             readOnly,
             characterDetailModel.MCharacterId);
 
+        if (readOnly)
+        {
+            EnablePreviewButtonsBestEffort(__instance, characterDetailModel.MCharacterId);
+        }
+
         if (readOnly && !_loggedFirstReadOnlyView)
         {
             _loggedFirstReadOnlyView = true;
             CgUnlockPlugin.LogSource.LogInfo(
-                $"[CGUnlock] 未持有角色技能升级入口已本地禁用(只读展示): first_id={characterDetailModel.MCharacterId}");
+                $"[CGUnlock] 未持有角色技能加减号可点，升级/解锁仍拦截: first_id={characterDetailModel.MCharacterId}");
+        }
+    }
+
+    internal static bool PrefixCreateExpectedAbility(
+        CharacterAbilityUpSimulator __instance,
+        ref AbilityModel? __result)
+    {
+        if (__instance == null)
+        {
+            return true;
+        }
+
+        var current = __instance.AbilityModel;
+        if (current == null || !IsUnownedSkillCharacter(current.MCharaId))
+        {
+            return true;
+        }
+
+        try
+        {
+            var expected = __instance.ExpectedData;
+            var level = expected == null ? current.Lv : expected.AbilityLv;
+            var rarity = default(ContentRarity);
+            var userData = Engine.Get<UserData>();
+            if (LocalCharacterRegistry.TryGet(userData, current.MCharaId, out var character) &&
+                character != null)
+            {
+                rarity = character.Rarity;
+            }
+
+            __result = AbilityModel.Create(
+                current.MasterId,
+                Math.Max(1, level),
+                current.AwakeLevel,
+                rarity,
+                Il2CppCancellationToken.None);
+            if (__result == null)
+            {
+                __result = current;
+                return false;
+            }
+
+            var tableId = ResolveLocalAbilityTableId(__result.TableId, current.MasterId);
+            if (tableId != 0)
+            {
+                __result._TableId_k__BackingField = tableId;
+            }
+
+            return false;
+        }
+        catch (Exception exception)
+        {
+            __result = current;
+            CgUnlockPlugin.LogSource.LogWarning(
+                $"[CGUnlock] 未持有角色技能预览已保留当前行: id={current.MCharaId}, master_id={current.MasterId}, error={exception.GetType().Name}");
+            return false;
+        }
+    }
+
+    internal static void PostfixInformationView(
+        CharacterAbilityUpInformationView __instance,
+        AbilityModel afterModel,
+        AbilityModel beforeModel)
+    {
+        if (__instance == null || afterModel == null || !IsUnownedSkillCharacter(afterModel.MCharaId))
+        {
+            return;
+        }
+
+        try
+        {
+            var group = __instance._fluctuationButtonGroup;
+            if (group == null)
+            {
+                return;
+            }
+
+            if (!afterModel.IsMaxLv)
+            {
+                EnablePreviewButton(group._plusButton);
+            }
+
+            if (beforeModel != null && afterModel.Lv > beforeModel.Lv)
+            {
+                EnablePreviewButton(group._minusButton);
+            }
+        }
+        catch (Exception exception)
+        {
+            CgUnlockPlugin.LogSource.LogWarning(
+                $"[CGUnlock] 未持有角色技能加减号刷新失败: id={afterModel.MCharaId}, error={exception.GetType().Name}");
         }
     }
 
@@ -346,6 +463,44 @@ internal static class CharacterAbilityLocalViewPatch
         }
 
         return !ShouldBlockMutationCommand(viewService, "ability_unlock");
+    }
+
+    private static bool IsUnownedSkillCharacter(long mCharacterId)
+    {
+        if (!PluginConfig.EnableUnownedCharacterSkillView.Value)
+        {
+            return false;
+        }
+
+        var userData = Engine.Get<UserData>();
+        return userData != null &&
+               LocalCharacterRegistry.TryGet(userData, mCharacterId, out var registered) &&
+               registered != null &&
+               !IsCharacterIdOwnedByCurrentAccount(mCharacterId);
+    }
+
+    private static void StampUnownedAbilityTableIds(CharacterDetailModel? model)
+    {
+        var abilities = model?.Ability?._models;
+        if (abilities == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < abilities.Length; i++)
+        {
+            var ability = abilities[i];
+            if (ability == null)
+            {
+                continue;
+            }
+
+            var tableId = ResolveLocalAbilityTableId(ability.TableId, ability.MasterId);
+            if (tableId != 0)
+            {
+                ability._TableId_k__BackingField = tableId;
+            }
+        }
     }
 
     private static bool IsCharacterIdOwnedByCurrentAccount(long mCharacterId)
@@ -517,11 +672,65 @@ internal static class CharacterAbilityLocalViewPatch
                 continue;
             }
 
-            ApplyButtonStateBestEffort(() => fluctuationButtonGroup._plusButton, readOnly, mCharacterId, $"plus[{i}]");
-            ApplyButtonStateBestEffort(() => fluctuationButtonGroup._minusButton, readOnly, mCharacterId, $"minus[{i}]");
             ApplyButtonStateBestEffort(() => fluctuationButtonGroup._maxButton, readOnly, mCharacterId, $"max[{i}]");
             ApplyButtonStateBestEffort(() => fluctuationButtonGroup._resetButton, readOnly, mCharacterId, $"row_reset[{i}]");
         }
+    }
+
+    private static void EnablePreviewButtonsBestEffort(
+        CharacterAbilityUpInfoBoxViewService viewService,
+        long mCharacterId)
+    {
+        Il2CppSystem.Collections.Generic.List<CharacterAbilityUpInformationView>? informationViews;
+        try
+        {
+            informationViews = viewService._abilityUpInformationViewList;
+        }
+        catch (Exception exception)
+        {
+            CgUnlockPlugin.LogSource.LogWarning(
+                $"[CGUnlock] 未持有角色技能加减号启用失败，行列表不可读: id={mCharacterId}, error={exception}");
+            return;
+        }
+
+        if (informationViews == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < informationViews.Count; i++)
+        {
+            FluctuationButtonGroup? group;
+            try
+            {
+                group = informationViews[i]?._fluctuationButtonGroup;
+            }
+            catch (Exception exception)
+            {
+                CgUnlockPlugin.LogSource.LogWarning(
+                    $"[CGUnlock] 未持有角色技能加减号启用失败: id={mCharacterId}, index={i}, error={exception}");
+                continue;
+            }
+
+            if (group == null)
+            {
+                continue;
+            }
+
+            EnablePreviewButton(group._plusButton);
+            EnablePreviewButton(group._minusButton);
+        }
+    }
+
+    private static void EnablePreviewButton(AppButton? button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.enabled = true;
+        button.interactable = true;
     }
 
     private static void ApplyButtonStateBestEffort(

@@ -92,6 +92,14 @@ internal static class PatchManager
             prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixUnlockCommand)));
 
         _harmony.Patch(
+            CharacterAbilityLocalViewPatch.TargetExpectedAbilityMethod(),
+            prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixCreateExpectedAbility)));
+
+        _harmony.Patch(
+            CharacterAbilityLocalViewPatch.TargetInformationViewMethod(),
+            postfix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PostfixInformationView)));
+
+        _harmony.Patch(
             PersonalStoryUnlockPatch.TargetMethod(),
             prefix: new HarmonyMethod(typeof(PersonalStoryUnlockPatch), nameof(PersonalStoryUnlockPatch.Prefix)));
 
