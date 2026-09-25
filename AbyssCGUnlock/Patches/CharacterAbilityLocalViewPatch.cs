@@ -71,7 +71,8 @@ internal static class CharacterAbilityLocalViewPatch
     {
         return AccessTools.Method(
             typeof(CharacterAbilityUpSimulator),
-            nameof(CharacterAbilityUpSimulator.CreateExpectedAbilityModel));
+            nameof(CharacterAbilityUpSimulator.CreateExpectedAbilityModel),
+            new[] { typeof(Il2CppCancellationToken) });
     }
 
     internal static MethodBase TargetInformationViewMethod()

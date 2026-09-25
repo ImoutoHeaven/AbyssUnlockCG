@@ -29,7 +29,10 @@ internal static class NovelReadBypassPatch
 {
     internal static MethodBase TargetMethod()
     {
-        return AccessTools.Method(typeof(NovelApiDataStore), nameof(NovelApiDataStore.RequestAsync));
+        return AccessTools.Method(
+            typeof(NovelApiDataStore),
+            nameof(NovelApiDataStore.RequestAsync),
+            new[] { typeof(NovelType), typeof(long), typeof(Il2CppSystem.Threading.CancellationToken) });
     }
 
     internal static bool Prefix(NovelType novelType, long mNovelId, ref Cysharp.Threading.Tasks.UniTask<NovelReadResponseEntity> __result)

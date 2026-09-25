@@ -15,7 +15,8 @@ internal static class CharacterCatalogCapturePatch
     {
         return AccessTools.Method(
             typeof(CharacterListSubService),
-            nameof(CharacterListSubService.CreateCharacterThumbnailModels));
+            nameof(CharacterListSubService.CreateCharacterThumbnailModels),
+            System.Type.EmptyTypes);
     }
 
     internal static void Postfix(CharacterListSubService __instance)

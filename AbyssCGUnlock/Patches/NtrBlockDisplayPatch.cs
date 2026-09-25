@@ -15,7 +15,10 @@ internal static class NtrBlockDisplayPatch
 {
     internal static MethodBase TargetMethod()
     {
-        return AccessTools.Method(typeof(StoryListPictThumbnail), nameof(StoryListPictThumbnail.UpdateView));
+        return AccessTools.Method(
+            typeof(StoryListPictThumbnail),
+            nameof(StoryListPictThumbnail.UpdateView),
+            new[] { typeof(StoryListThumbnailModel) });
     }
 
     internal static void Prefix(StoryListThumbnailModel model)

@@ -5,6 +5,7 @@ using HarmonyLib;
 using Il2CppInterop.Runtime;
 using Project.Interaction.AdventurerDetail;
 using Project.Master;
+using Project.Master.NoaMessagePack;
 
 namespace AbyssCGUnlock.Patches;
 
@@ -29,7 +30,17 @@ internal static class StoryListUnlockPatch
 {
     internal static MethodBase TargetMethod()
     {
-        return AccessTools.Method(typeof(R18StoryListViewController), nameof(R18StoryListViewController.UpdateListView));
+        return AccessTools.Method(
+            typeof(R18StoryListViewController),
+            nameof(R18StoryListViewController.UpdateListView),
+            new[]
+            {
+                typeof(Il2CppSystem.Collections.Generic.IEnumerable<MNovelCharacters>),
+                typeof(Il2CppSystem.Collections.Generic.IEnumerable<MNovelCharacterSkins>),
+                typeof(int),
+                typeof(Il2CppSystem.Collections.Generic.List<long>),
+                typeof(bool),
+            });
     }
 
     internal static void Postfix(R18StoryListViewController __instance)
