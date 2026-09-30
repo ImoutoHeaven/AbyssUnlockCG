@@ -38,7 +38,7 @@ internal static class StoryListUnlockPatch
                 typeof(Il2CppSystem.Collections.Generic.IEnumerable<MNovelCharacters>),
                 typeof(Il2CppSystem.Collections.Generic.IEnumerable<MNovelCharacterSkins>),
                 typeof(int),
-                typeof(Il2CppSystem.Collections.Generic.List<long>),
+                typeof(Il2CppSystem.Collections.Generic.HashSet<long>),
                 typeof(bool),
             });
     }
