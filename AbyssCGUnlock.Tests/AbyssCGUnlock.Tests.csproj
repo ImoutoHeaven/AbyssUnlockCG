@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GameDir Condition="'$(GameDir)' == ''">$(ABYSS_GAME_DIR)</GameDir>
     <GameDir Condition="'$(GameDir)' == ''">C:\Users\Eden\PixelAbyssX\dotabyss_x_cl</GameDir>
     <RestoreAdditionalProjectSources>https://api.nuget.org/v3/index.json;https://nuget.bepinex.dev/v3/index.json;https://nuget.samboy.dev/v3/index.json</RestoreAdditionalProjectSources>
@@ -29,6 +30,7 @@
     <!-- 编译期需要 BepInEx / Il2CppInterop 与游戏 interop 代理程序集 -->
     <Reference Include="$(GameDir)/BepInEx/core/BepInEx.Core.dll" Private="true" />
     <Reference Include="$(GameDir)/BepInEx/core/BepInEx.Unity.IL2CPP.dll" Private="true" />
+    <Reference Include="$(GameDir)/BepInEx/core/Il2CppInterop.Common.dll" Private="true" />
     <Reference Include="$(GameDir)/BepInEx/core/Il2CppInterop.Runtime.dll" Private="true" />
     <Reference Include="$(GameDir)/BepInEx/core/Il2CppInterop.HarmonySupport.dll" Private="true" />
     <Reference Include="$(GameDir)/BepInEx/core/0Harmony.dll" Private="true" />

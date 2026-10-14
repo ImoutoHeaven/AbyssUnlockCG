@@ -12,6 +12,8 @@ namespace AbyssCGUnlock.Patches;
 /// </summary>
 internal static class PatchManager
 {
+    private static Harmony _harmony = null!;
+
     internal sealed record PatchRegistration(
         string Name,
         Func<MethodBase> Resolve,
@@ -40,9 +42,7 @@ internal static class PatchManager
         new PatchRegistration(
             nameof(NovelReadBypassPatch) + "." + nameof(NovelReadBypassPatch.TargetMethod),
             NovelReadBypassPatch.TargetMethod,
-            static (harmony, target) => harmony.Patch(
-                target,
-                prefix: new HarmonyMethod(typeof(NovelReadBypassPatch), nameof(NovelReadBypassPatch.Prefix)))),
+            static (_, target) => NovelReadBypassPatch.Install(target)),
         new PatchRegistration(
             nameof(CharacterTopLocalUnlockPatch) + "." + nameof(CharacterTopLocalUnlockPatch.TargetMethod),
             CharacterTopLocalUnlockPatch.TargetMethod,
@@ -261,8 +261,21 @@ internal static class PatchManager
             throw new InvalidOperationException("Cannot install CGUnlock patches after a failed compatibility precheck.");
         }
 
-        var harmony = new Harmony(PluginInfo.PluginGuid);
-        ApplyInstallersWithRollback(preflight.Installers, harmony, harmony.UnpatchSelf);
-        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] Harmony patch registration complete.");
+        _harmony = new Harmony(PluginInfo.PluginGuid);
+        ApplyInstallersWithRollback(preflight.Installers, _harmony, Shutdown);
+        CgUnlockPlugin.LogSource.LogInfo("[CGUnlock] Patch registration complete (NovelRead native ABI).");
+    }
+
+    internal static void Shutdown()
+    {
+        try
+        {
+            NovelReadBypassPatch.Dispose();
+        }
+        finally
+        {
+            _harmony?.UnpatchSelf();
+            _harmony = null!;
+        }
     }
 }
