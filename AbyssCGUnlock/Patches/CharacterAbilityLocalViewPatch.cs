@@ -35,6 +35,8 @@ internal static class CharacterAbilityLocalViewPatch
     private static bool _loggedFirstReadOnlyView;
     private static bool _loggedFirstBlockedMutation;
 
+    private static PropertyInfo _unlockCommandSourceProperty = null!;
+
     internal static MethodBase TargetModelFactoryMethod()
     {
         return AccessTools.Method(
@@ -53,18 +55,35 @@ internal static class CharacterAbilityLocalViewPatch
 
     internal static MethodBase TargetAbilityUpCommandMethod()
     {
-        return AccessTools.Method(
-            typeof(CharacterAbilityUpInfoBoxViewService.__c),
-            nameof(CharacterAbilityUpInfoBoxViewService.__c._InitializeViewAsync_b__15_1),
+        return GeneratedTargets.FindClosureMethod(
+            typeof(CharacterAbilityUpInfoBoxViewService),
+            "_InitializeViewAsync_b__15_1",
             new[] { typeof(UniRx.Unit), typeof(CharacterAbilityUpInfoBoxViewService) });
     }
 
     internal static MethodBase TargetUnlockCommandMethod()
     {
-        return AccessTools.Method(
-            typeof(CharacterAbilityUpInfoBoxViewService.__c__DisplayClass33_0),
-            nameof(CharacterAbilityUpInfoBoxViewService.__c__DisplayClass33_0._OpenUnlockConfirmPopupAsync_b__0),
+        var target = GeneratedTargets.FindClosureMethod(
+            typeof(CharacterAbilityUpInfoBoxViewService),
+            "_OpenUnlockConfirmPopupAsync_b__0",
             Type.EmptyTypes);
+
+        // Fail closed on capture drift: the Prefix reads the owning view service by name.
+        var owner = target.DeclaringType!;
+        _unlockCommandSourceProperty = AccessTools.Property(owner, "__4__this");
+        if (_unlockCommandSourceProperty == null)
+        {
+            throw new MissingMemberException(owner.FullName + " no longer captures <>4__this.");
+        }
+
+        if (_unlockCommandSourceProperty.PropertyType != typeof(CharacterAbilityUpInfoBoxViewService))
+        {
+            throw new MissingMemberException(
+                owner.FullName + " captured <>4__this as " + _unlockCommandSourceProperty.PropertyType.FullName +
+                ", expected " + typeof(CharacterAbilityUpInfoBoxViewService).FullName + ".");
+        }
+
+        return target;
     }
 
     internal static MethodBase TargetExpectedAbilityMethod()
@@ -448,13 +467,12 @@ internal static class CharacterAbilityLocalViewPatch
         return !ShouldBlockMutationCommand(viewService, "ability_up");
     }
 
-    internal static bool PrefixUnlockCommand(
-        CharacterAbilityUpInfoBoxViewService.__c__DisplayClass33_0 __instance)
+    internal static bool PrefixUnlockCommand(object __instance)
     {
         CharacterAbilityUpInfoBoxViewService? viewService = null;
         try
         {
-            viewService = __instance?.__4__this;
+            viewService = _unlockCommandSourceProperty.GetValue(__instance) as CharacterAbilityUpInfoBoxViewService;
         }
         catch (Exception exception)
         {

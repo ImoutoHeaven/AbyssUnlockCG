@@ -10,6 +10,10 @@ namespace AbyssCGUnlock.Patches;
 /// <summary>
 /// Bypasses the client-only tavern-registration overlay at the exact NTR-mode callback.
 /// The backing field is restored in a Harmony Finalizer even when the native callback throws.
+///
+/// The callback lives in a compiler-generated closure class, so the class index is renumbered by every
+/// game update (&lt;&gt;c__DisplayClass90_0 became 91_0 on 2026-10-30). The lambda itself keeps its name
+/// and signature, so it is resolved by those at precheck.
 /// </summary>
 internal static class NtrSceneEntryPatch
 {
@@ -28,9 +32,9 @@ internal static class NtrSceneEntryPatch
 
     internal static MethodBase TargetMethod()
     {
-        return AccessTools.Method(
-            typeof(DetailSubService.__c__DisplayClass90_0),
-            nameof(DetailSubService.__c__DisplayClass90_0._InitializeViewAsync_b__6),
+        return GeneratedTargets.FindClosureMethod(
+            typeof(DetailSubService),
+            "_InitializeViewAsync_b__6",
             new[] { typeof(Unit), typeof(DetailSubService), typeof(GameObject) });
     }
 

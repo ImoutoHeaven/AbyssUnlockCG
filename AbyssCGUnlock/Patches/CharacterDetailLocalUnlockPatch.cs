@@ -3,7 +3,6 @@ using System.Reflection;
 using HarmonyLib;
 using Project.User;
 using DetailSubService = Project.Interaction.AdventurerDetail.SubService;
-using UpdateViewStateMachine = Project.Interaction.AdventurerDetail.SubService._UpdateView_d__101;
 using Il2CppCharacterDataList = Il2CppSystem.Collections.Generic.List<Project.User.CharacterData>;
 
 namespace AbyssCGUnlock.Patches;
@@ -16,9 +15,17 @@ namespace AbyssCGUnlock.Patches;
 /// into its callers: the 2026-10-19 build inlines it into AdventurerDetail.SubScene.OnRefreshAsync and
 /// calls MoveNext directly, which drops UpdateView's caller count from 4 to 3 and makes a patch on the
 /// stub unreachable on the page-refresh path. Every caller, inlined or not, still runs MoveNext.
+///
+/// The state machine type name is compiler-generated and renumbered by every game update
+/// (&lt;UpdateView&gt;d__101 became d__104 on 2026-10-30), so it is resolved by method name at precheck
+/// and its members are read through cached reflection handles.
 /// </summary>
 internal static class CharacterDetailLocalUnlockPatch
 {
+    private static PropertyInfo _stateProperty = null!;
+    private static PropertyInfo _characterIdProperty = null!;
+    private static PropertyInfo _serviceProperty = null!;
+
     internal readonly struct InjectionState
     {
         internal InjectionState(Il2CppCharacterDataList list, CharacterData character)
@@ -34,23 +41,42 @@ internal static class CharacterDetailLocalUnlockPatch
 
     internal static MethodBase TargetMethod()
     {
-        // Fail closed on field drift: the Prefix reads both of these by name.
-        if (AccessTools.Property(typeof(UpdateViewStateMachine), "tCharacterId") == null ||
-            AccessTools.Property(typeof(UpdateViewStateMachine), "__4__this") == null ||
-            AccessTools.Property(typeof(UpdateViewStateMachine), "__1__state") == null)
+        var stateMachine = GeneratedTargets.FindStateMachine(
+            typeof(DetailSubService),
+            nameof(DetailSubService.UpdateView));
+
+        // Fail closed on field drift: the Prefix reads all three by name.
+        _stateProperty = AccessTools.Property(stateMachine, "__1__state");
+        _characterIdProperty = AccessTools.Property(stateMachine, "tCharacterId");
+        _serviceProperty = AccessTools.Property(stateMachine, "__4__this");
+        if (_stateProperty == null || _characterIdProperty == null || _serviceProperty == null)
         {
             throw new MissingMemberException(
-                "AdventurerDetail UpdateView state machine no longer exposes tCharacterId/<>4__this/__1__state.");
+                stateMachine.FullName + " no longer exposes tCharacterId/<>4__this/<>1__state.");
         }
 
-        return AccessTools.Method(
-            typeof(UpdateViewStateMachine),
-            nameof(UpdateViewStateMachine.MoveNext),
-            Type.EmptyTypes);
+        // The Prefix casts these reads, so the types are part of the contract and must fail at precheck,
+        // not as an InvalidCastException inside the patched state machine.
+        if (_stateProperty.PropertyType != typeof(int) ||
+            _characterIdProperty.PropertyType != typeof(long) ||
+            _serviceProperty.PropertyType != typeof(DetailSubService))
+        {
+            throw new MissingMemberException(
+                stateMachine.FullName + " changed member types: expected <>1__state:int, tCharacterId:long, <>4__this:" +
+                typeof(DetailSubService).FullName + ".");
+        }
+
+        var moveNext = AccessTools.Method(stateMachine, "MoveNext", Type.EmptyTypes);
+        if (moveNext == null)
+        {
+            throw new MissingMethodException(stateMachine.FullName + ".MoveNext() is missing.");
+        }
+
+        return moveNext;
     }
 
     internal static void Prefix(
-        UpdateViewStateMachine __instance,
+        object __instance,
         out InjectionState __state)
     {
         __state = default;
@@ -62,18 +88,18 @@ internal static class CharacterDetailLocalUnlockPatch
 
         // State -1 is the initial synchronous segment; that segment contains the throwing lookup.
         // Later segments resume only to store the already resolved CharacterData.
-        if (__instance.__1__state != -1)
+        if ((int)_stateProperty.GetValue(__instance)! != -1)
         {
             return;
         }
 
-        var detail = __instance.__4__this;
+        var detail = (DetailSubService)_serviceProperty.GetValue(__instance)!;
         if (detail == null)
         {
             return;
         }
 
-        var tCharacterId = __instance.tCharacterId;
+        var tCharacterId = (long)_characterIdProperty.GetValue(__instance)!;
         var userData = detail._userData;
         if (PluginConfig.EnableLocalCharacterSkinChange.Value)
         {

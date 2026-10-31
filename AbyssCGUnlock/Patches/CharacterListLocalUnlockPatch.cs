@@ -45,9 +45,9 @@ internal static class UnownedCharacterSelectionPatch
 {
     internal static MethodBase TargetMethod()
     {
-        return AccessTools.Method(
-            typeof(CharacterListSubService.__c),
-            nameof(CharacterListSubService.__c._SetupCharacterListEvent_b__33_0),
+        return GeneratedTargets.FindClosureMethod(
+            typeof(CharacterListSubService),
+            "_SetupCharacterListEvent_b__33_0",
             new[] { typeof(CharacterInteractionThumbnailModel), typeof(CharacterListSubService) });
     }
 

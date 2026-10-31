@@ -108,9 +108,9 @@ internal static class SkinChangePopupLocalPatch
 
     internal static MethodBase TargetConfirmSubscriptionMethod()
     {
-        return AccessTools.Method(
-            typeof(SkinChangePopupController.__c),
-            nameof(SkinChangePopupController.__c._SetupPopupEvent_b__13_1),
+        return GeneratedTargets.FindClosureMethod(
+            typeof(SkinChangePopupController),
+            "_SetupPopupEvent_b__13_1",
             new[] { typeof(Unit), typeof(SkinChangePopupController) });
     }
 

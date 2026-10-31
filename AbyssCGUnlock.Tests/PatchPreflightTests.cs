@@ -110,6 +110,25 @@ public sealed class PatchPreflightTests
         Assert.True(abort < config && abort < patchInstall);
     }
 
+    /// <summary>
+    /// The generated-name targets must land on the current build's generated holders by shape, so a
+    /// renumbered index cannot silently bind a sibling lambda or a stale state machine.
+    /// </summary>
+    [Fact]
+    public void Preflight_resolves_generated_targets_by_shape_not_by_index()
+    {
+        RegisterGameProxyResolution();
+
+        var detail = CharacterDetailLocalUnlockPatch.TargetMethod();
+        Assert.StartsWith("_UpdateView_d__", detail.DeclaringType!.Name);
+        Assert.Equal("MoveNext", detail.Name);
+
+        var ntr = NtrSceneEntryPatch.TargetMethod();
+        Assert.StartsWith("__c__DisplayClass", ntr.DeclaringType!.Name);
+        Assert.Equal("_InitializeViewAsync_b__6", ntr.Name);
+        Assert.Equal(3, ntr.GetParameters().Length);
+    }
+
     private static string FindRepositoryRoot()
     {
         var candidates = new[]

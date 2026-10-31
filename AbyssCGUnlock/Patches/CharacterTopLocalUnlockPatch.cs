@@ -6,7 +6,7 @@ using System.Reflection;
 using Absf;
 using HarmonyLib;
 using Project.User;
-using CharacterTopRefreshStateMachine = Project.CharacterTop.SubScene._OnRefreshAsync_d__10;
+using CharacterTopSubScene = Project.CharacterTop.SubScene;
 using Il2CppCharacterDataList = Il2CppSystem.Collections.Generic.List<Project.User.CharacterData>;
 
 namespace AbyssCGUnlock.Patches;
@@ -30,23 +30,35 @@ internal static class CharacterTopLocalUnlockPatch
         internal List<CharacterData> Added { get; }
     }
 
+    private static PropertyInfo _stateProperty = null!;
+
     internal static MethodBase TargetMethod()
     {
-        return AccessTools.Method(
-            typeof(CharacterTopRefreshStateMachine),
-            nameof(CharacterTopRefreshStateMachine.MoveNext),
-            Type.EmptyTypes);
+        var stateMachine = GeneratedTargets.FindStateMachine(
+            typeof(CharacterTopSubScene),
+            nameof(CharacterTopSubScene.OnRefreshAsync));
+
+        _stateProperty = AccessTools.Property(stateMachine, "__1__state")
+            ?? throw new MissingMemberException(stateMachine.FullName + " no longer exposes <>1__state.");
+        if (_stateProperty.PropertyType != typeof(int))
+        {
+            throw new MissingMemberException(
+                stateMachine.FullName + " changed <>1__state type: expected int, got " + _stateProperty.PropertyType.FullName + ".");
+        }
+
+        return AccessTools.Method(stateMachine, "MoveNext", Type.EmptyTypes)
+            ?? throw new MissingMethodException(stateMachine.FullName + ".MoveNext() is missing.");
     }
 
     internal static void Prefix(
-        CharacterTopRefreshStateMachine __instance,
+        object __instance,
         out InjectionState? __state)
     {
         __state = null;
         UserData? userData = null;
 
         // State -1 is the initial synchronous MoveNext. State 0 resumes after the base refresh await.
-        if (__instance == null || __instance.__1__state != -1)
+        if (__instance == null || (int)_stateProperty.GetValue(__instance)! != -1)
         {
             return;
         }
