@@ -129,6 +129,24 @@ public sealed class PatchPreflightTests
         Assert.Equal(3, ntr.GetParameters().Length);
     }
 
+    /// <summary>
+    /// The read-only pass must hang off a method this build still calls. The ability box's own
+    /// UpdateView(CharacterDetailModel) has no call sites because IL2CPP inlined it into the group
+    /// refresh, so binding it there leaves every view untagged and the fail-closed command boundary
+    /// blocks account-owned characters as well.
+    /// </summary>
+    [Fact]
+    public void ReadOnly_pass_binds_the_group_refresh_that_the_build_calls()
+    {
+        RegisterGameProxyResolution();
+
+        var target = CharacterAbilityLocalViewPatch.TargetGroupViewMethod();
+
+        Assert.Equal(typeof(Project.CharacterDetail.CharacterInfoBoxGroupViewService), target.DeclaringType);
+        Assert.Equal("UpdateView", target.Name);
+        Assert.Equal(2, target.GetParameters().Length);
+    }
+
     private static string FindRepositoryRoot()
     {
         var candidates = new[]

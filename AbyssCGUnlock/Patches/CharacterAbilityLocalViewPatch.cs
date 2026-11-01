@@ -22,14 +22,16 @@ namespace AbyssCGUnlock.Patches;
 /// produces an empty skill tab for registry-backed characters. Mutation controls stay disabled
 /// after the native view renders except the per-row plus and minus buttons, which only change
 /// the local expected level preview.
+///
+/// Ownership is resolved from the view's current CharacterDetailModel against the account's own
+/// CharacterData rows. It is never granted by a view tag: the ability box's own
+/// UpdateView(CharacterDetailModel) has no call sites in the 2026-10-30 build because IL2CPP
+/// inlined it into CharacterInfoBoxGroupViewService.UpdateView, so a tag written there never
+/// existed and the fail-closed command boundary blocked every account-owned character too.
 /// </summary>
 internal static class CharacterAbilityLocalViewPatch
 {
     private static readonly HashSet<IntPtr> DisabledButtonPointers = new();
-    private static readonly HashSet<IntPtr> BlockedSkillModelPointers = new();
-    private static readonly HashSet<IntPtr> OwnedSkillModelPointers = new();
-    private static readonly HashSet<IntPtr> BlockedSkillViewPointers = new();
-    private static readonly HashSet<IntPtr> OwnedSkillViewPointers = new();
     private static bool _loggedFirstMasterModel;
     private static bool _loggedFirstProjectedPresentation;
     private static bool _loggedFirstReadOnlyView;
@@ -45,12 +47,49 @@ internal static class CharacterAbilityLocalViewPatch
             new[] { typeof(MasterDataStore), typeof(CharacterData) });
     }
 
-    internal static MethodBase TargetReadOnlyViewMethod()
+    /// <summary>
+    /// The ability box's UpdateView(CharacterDetailModel) is inlined into the group refresh, so the
+    /// read-only pass hangs off the group method that actually runs on every detail refresh.
+    /// </summary>
+    internal static MethodBase TargetGroupViewMethod()
     {
-        return AccessTools.Method(
-            typeof(CharacterAbilityUpInfoBoxViewService),
-            nameof(CharacterAbilityUpInfoBoxViewService.UpdateView),
-            new[] { typeof(CharacterDetailModel) });
+        var tabType = AccessTools.Inner(typeof(CharacterInfoBoxGroupViewService), "TabType");
+        if (tabType == null)
+        {
+            throw new MissingMemberException(
+                typeof(CharacterInfoBoxGroupViewService).FullName + " no longer declares TabType.");
+        }
+
+        var abilityService = AccessTools.Property(
+            typeof(CharacterInfoBoxGroupViewService),
+            "_characterAbilityUpInfoBoxViewService");
+        if (abilityService == null ||
+            abilityService.PropertyType != typeof(CharacterAbilityUpInfoBoxViewService))
+        {
+            throw new MissingMemberException(
+                typeof(CharacterInfoBoxGroupViewService).FullName +
+                " no longer exposes _characterAbilityUpInfoBoxViewService.");
+        }
+
+        // Fail closed on capture drift: the prefix and postfix read the current model by name.
+        if (AccessTools.Property(typeof(CharacterAbilityUpInfoBoxViewService), "_characterDetailModel") == null)
+        {
+            throw new MissingMemberException(
+                typeof(CharacterAbilityUpInfoBoxViewService).FullName + " no longer exposes _characterDetailModel.");
+        }
+
+        var target = AccessTools.Method(
+            typeof(CharacterInfoBoxGroupViewService),
+            nameof(CharacterInfoBoxGroupViewService.UpdateView),
+            new[] { typeof(CharacterDetailModel), typeof(Il2CppSystem.Nullable<>).MakeGenericType(tabType) });
+        if (target == null)
+        {
+            throw new MissingMemberException(
+                typeof(CharacterInfoBoxGroupViewService).FullName +
+                " no longer declares UpdateView(CharacterDetailModel, TabType?).");
+        }
+
+        return target;
     }
 
     internal static MethodBase TargetAbilityUpCommandMethod()
@@ -108,13 +147,8 @@ internal static class CharacterAbilityLocalViewPatch
     internal static bool PrefixModelFactory(
         MasterDataStore dataStore,
         CharacterData character,
-        ref CharacterDetailModel? __result,
-        out bool __state)
+        ref CharacterDetailModel? __result)
     {
-        // With the feature enabled, unknown provenance is conservatively read-only. We clear this
-        // only after positively matching the exact CharacterData object in the account-owned list.
-        __state = PluginConfig.EnableUnownedCharacterSkillView.Value && character != null;
-
         if (character == null)
         {
             return true;
@@ -154,11 +188,6 @@ internal static class CharacterAbilityLocalViewPatch
             // temporarily injects this exact synthetic object while native detail rendering runs.
             if (!isRegistryCharacter)
             {
-                if (IsExactOwnedCharacterRow(userData, character))
-                {
-                    __state = false;
-                }
-
                 return true;
             }
 
@@ -236,138 +265,72 @@ internal static class CharacterAbilityLocalViewPatch
         }
     }
 
-    internal static void PostfixModelFactory(
-        CharacterDetailModel? __result,
-        bool __state)
-    {
-        if (__result == null)
-        {
-            return;
-        }
-
-        try
-        {
-            var modelPointer = IL2CPP.Il2CppObjectBaseToPtr(__result);
-            if (__state)
-            {
-                OwnedSkillModelPointers.Remove(modelPointer);
-                BlockedSkillModelPointers.Add(modelPointer);
-                return;
-            }
-
-            BlockedSkillModelPointers.Remove(modelPointer);
-            OwnedSkillModelPointers.Add(modelPointer);
-        }
-        catch (Exception exception)
-        {
-            CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 技能模型来源标记失败；后续未知视图将保持只读: error={exception}");
-        }
-    }
-
     internal static void PrefixRestoreTrackedButtons(
-        CharacterAbilityUpInfoBoxViewService __instance)
+        CharacterInfoBoxGroupViewService __instance)
     {
-        if (__instance == null)
+        var viewService = AbilityViewServiceOf(__instance);
+        if (viewService == null)
         {
             return;
-        }
-
-        try
-        {
-            // Invalidate the previous character's ownership before native UpdateView. Only a
-            // successful postfix may promote this reused service back to account-owned.
-            var viewPointer = IL2CPP.Il2CppObjectBaseToPtr(__instance);
-            OwnedSkillViewPointers.Remove(viewPointer);
-            BlockedSkillViewPointers.Add(viewPointer);
-        }
-        catch (Exception exception)
-        {
-            // If this particular native pointer cannot be read, discard every positive grant. A
-            // later successful postfix will rebuild only the currently valid owned-view grant.
-            OwnedSkillViewPointers.Clear();
-            CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 技能视图切换前来源标记失效失败；命令边界仍按未知来源阻断: error={exception}");
         }
 
         // Undo only this patch's previous component.enabled changes before native UpdateView runs.
-        // Native code can then calculate the selected owned character's button state from scratch.
-        ApplyAllMutationButtonStatesBestEffort(__instance, false, 0);
+        // Native code can then calculate the selected character's button state from scratch.
+        ApplyAllMutationButtonStatesBestEffort(viewService, false, 0);
     }
 
-    internal static void PostfixReadOnlyView(
-        CharacterAbilityUpInfoBoxViewService __instance,
-        CharacterDetailModel characterDetailModel)
+    internal static void PostfixReadOnlyView(CharacterInfoBoxGroupViewService __instance)
     {
-        if (__instance == null || characterDetailModel == null)
+        var viewService = AbilityViewServiceOf(__instance);
+        if (viewService == null)
         {
             return;
         }
 
+        long mCharacterId;
         bool readOnly;
-        IntPtr viewPointer;
         try
         {
-            viewPointer = IL2CPP.Il2CppObjectBaseToPtr(__instance);
-            var modelPointer = IL2CPP.Il2CppObjectBaseToPtr(characterDetailModel);
-            if (BlockedSkillModelPointers.Contains(modelPointer))
-            {
-                readOnly = true;
-            }
-            else if (OwnedSkillModelPointers.Contains(modelPointer))
-            {
-                readOnly = false;
-            }
-            else
-            {
-                // Models created outside the patched factory are unknown until the current account
-                // positively contains the same character ID. Unknown/unowned IDs stay read-only.
-                readOnly = !IsCharacterIdOwnedByCurrentAccount(characterDetailModel.MCharacterId);
-            }
+            var characterDetailModel = viewService._characterDetailModel;
+            mCharacterId = characterDetailModel == null ? 0 : characterDetailModel.MCharacterId;
+            // Ownership comes from the account's own rows, never from a view tag. Unknown IDs stay
+            // read-only, so a registry-backed character keeps its preview-only skill tab.
+            readOnly = mCharacterId == 0 || !IsCharacterIdOwnedByCurrentAccount(mCharacterId);
         }
         catch (Exception exception)
         {
             CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 技能视图来源识别失败，按未知来源保持只读: id={characterDetailModel.MCharacterId}, error={exception}");
-            try
-            {
-                viewPointer = IL2CPP.Il2CppObjectBaseToPtr(__instance);
-            }
-            catch
-            {
-                // A broken view cannot be interacted with safely; no marker can be attached.
-                return;
-            }
-
-            readOnly = true;
+                $"[CGUnlock] 技能视图来源识别失败，按未知来源保持只读: error={exception}");
+            return;
         }
+
+        ApplyAllMutationButtonStatesBestEffort(viewService, readOnly, mCharacterId);
 
         if (readOnly)
         {
-            OwnedSkillViewPointers.Remove(viewPointer);
-            BlockedSkillViewPointers.Add(viewPointer);
-        }
-        else
-        {
-            BlockedSkillViewPointers.Remove(viewPointer);
-            OwnedSkillViewPointers.Add(viewPointer);
-        }
-
-        ApplyAllMutationButtonStatesBestEffort(
-            __instance,
-            readOnly,
-            characterDetailModel.MCharacterId);
-
-        if (readOnly)
-        {
-            EnablePreviewButtonsBestEffort(__instance, characterDetailModel.MCharacterId);
+            EnablePreviewButtonsBestEffort(viewService, mCharacterId);
         }
 
         if (readOnly && !_loggedFirstReadOnlyView)
         {
             _loggedFirstReadOnlyView = true;
             CgUnlockPlugin.LogSource.LogInfo(
-                $"[CGUnlock] 未持有角色技能加减号可点，升级/解锁仍拦截: first_id={characterDetailModel.MCharacterId}");
+                $"[CGUnlock] 未持有角色技能加减号可点，升级/解锁仍拦截: first_id={mCharacterId}");
+        }
+    }
+
+    private static CharacterAbilityUpInfoBoxViewService? AbilityViewServiceOf(
+        CharacterInfoBoxGroupViewService? groupViewService)
+    {
+        try
+        {
+            return groupViewService?._characterAbilityUpInfoBoxViewService;
+        }
+        catch (Exception exception)
+        {
+            CgUnlockPlugin.LogSource.LogWarning(
+                $"[CGUnlock] 技能视图服务读取失败: error={exception.GetType().Name}");
+            return null;
         }
     }
 
@@ -563,61 +526,25 @@ internal static class CharacterAbilityLocalViewPatch
         return false;
     }
 
-    private static bool IsExactOwnedCharacterRow(UserData? userData, CharacterData character)
-    {
-        var ownedRows = userData?._CharaDataStore_k__BackingField?._dataList;
-        if (ownedRows == null)
-        {
-            return false;
-        }
-
-        var characterPointer = IL2CPP.Il2CppObjectBaseToPtr(character);
-        for (var i = 0; i < ownedRows.Count; i++)
-        {
-            var row = ownedRows[i];
-            if (row != null &&
-                row.MCharaId == character.MCharaId &&
-                IL2CPP.Il2CppObjectBaseToPtr(row) == characterPointer)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static bool ShouldBlockMutationCommand(
         CharacterAbilityUpInfoBoxViewService? viewService,
         string command)
     {
-        if (viewService == null)
-        {
-            return PluginConfig.EnableUnownedCharacterSkillView.Value;
-        }
-
         if (!PluginConfig.EnableUnownedCharacterSkillView.Value)
         {
             return false;
         }
 
+        if (viewService == null)
+        {
+            return true;
+        }
+
+        long mCharacterId;
         try
         {
-            var viewPointer = IL2CPP.Il2CppObjectBaseToPtr(viewService);
-            if (OwnedSkillViewPointers.Contains(viewPointer))
-            {
-                return false;
-            }
-
-            if (!_loggedFirstBlockedMutation && BlockedSkillViewPointers.Contains(viewPointer))
-            {
-                _loggedFirstBlockedMutation = true;
-                CgUnlockPlugin.LogSource.LogInfo(
-                    $"[CGUnlock] 未持有角色技能变更命令已在同步点击边界拦截: command={command}");
-            }
-
-            // Only a view positively tagged from an exact account-owned CharacterData row is
-            // allowed through. Tagged-local and unknown views both fail closed before UniTask/API.
-            return true;
+            var characterDetailModel = viewService._characterDetailModel;
+            mCharacterId = characterDetailModel == null ? 0 : characterDetailModel.MCharacterId;
         }
         catch (Exception exception)
         {
@@ -625,6 +552,22 @@ internal static class CharacterAbilityLocalViewPatch
                 $"[CGUnlock] 未持有角色技能变更命令识别失败，按未知来源阻断: command={command}, error={exception}");
             return true;
         }
+
+        // The account's own rows decide. An unknown ID, or a registry-backed unowned character,
+        // fails closed before the UniTask/API call so a preview never mutates anything.
+        if (mCharacterId != 0 && IsCharacterIdOwnedByCurrentAccount(mCharacterId))
+        {
+            return false;
+        }
+
+        if (!_loggedFirstBlockedMutation)
+        {
+            _loggedFirstBlockedMutation = true;
+            CgUnlockPlugin.LogSource.LogInfo(
+                $"[CGUnlock] 未持有角色技能变更命令已在同步点击边界拦截: command={command}, id={mCharacterId}");
+        }
+
+        return true;
     }
 
     private static void ApplyAllMutationButtonStatesBestEffort(
