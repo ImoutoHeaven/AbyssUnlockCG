@@ -114,11 +114,10 @@ internal static class PatchManager
                 target,
                 prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixModelFactory)))),
         new PatchRegistration(
-            nameof(CharacterAbilityLocalViewPatch) + "." + nameof(CharacterAbilityLocalViewPatch.TargetGroupViewMethod),
-            CharacterAbilityLocalViewPatch.TargetGroupViewMethod,
+            nameof(CharacterAbilityLocalViewPatch) + "." + nameof(CharacterAbilityLocalViewPatch.TargetAbilityViewRefreshMethod),
+            CharacterAbilityLocalViewPatch.TargetAbilityViewRefreshMethod,
             static (harmony, target) => harmony.Patch(
                 target,
-                prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixRestoreTrackedButtons)),
                 postfix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PostfixReadOnlyView)))),
         new PatchRegistration(
             nameof(CharacterAbilityLocalViewPatch) + "." + nameof(CharacterAbilityLocalViewPatch.TargetAbilityUpCommandMethod),

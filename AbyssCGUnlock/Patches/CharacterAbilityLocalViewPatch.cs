@@ -48,30 +48,14 @@ internal static class CharacterAbilityLocalViewPatch
     }
 
     /// <summary>
-    /// The ability box's UpdateView(CharacterDetailModel) is inlined into the group refresh, so the
-    /// read-only pass hangs off the group method that actually runs on every detail refresh.
+    /// The ability box's own UpdateView(CharacterDetailModel) is inlined into the group refresh, so
+    /// the read-only pass hangs off UpdateParameterViews, which that inlined body calls at the end
+    /// of every refresh. Its only parameter is an int: a Nullable&lt;TabType&gt; hook aborts the
+    /// whole refresh in the native-to-managed trampoline (Buffer.Memmove NRE).
     /// </summary>
-    internal static MethodBase TargetGroupViewMethod()
+    internal static MethodBase TargetAbilityViewRefreshMethod()
     {
-        var tabType = AccessTools.Inner(typeof(CharacterInfoBoxGroupViewService), "TabType");
-        if (tabType == null)
-        {
-            throw new MissingMemberException(
-                typeof(CharacterInfoBoxGroupViewService).FullName + " no longer declares TabType.");
-        }
-
-        var abilityService = AccessTools.Property(
-            typeof(CharacterInfoBoxGroupViewService),
-            "_characterAbilityUpInfoBoxViewService");
-        if (abilityService == null ||
-            abilityService.PropertyType != typeof(CharacterAbilityUpInfoBoxViewService))
-        {
-            throw new MissingMemberException(
-                typeof(CharacterInfoBoxGroupViewService).FullName +
-                " no longer exposes _characterAbilityUpInfoBoxViewService.");
-        }
-
-        // Fail closed on capture drift: the prefix and postfix read the current model by name.
+        // Fail closed on capture drift: the postfix reads the current model by name.
         if (AccessTools.Property(typeof(CharacterAbilityUpInfoBoxViewService), "_characterDetailModel") == null)
         {
             throw new MissingMemberException(
@@ -79,14 +63,13 @@ internal static class CharacterAbilityLocalViewPatch
         }
 
         var target = AccessTools.Method(
-            typeof(CharacterInfoBoxGroupViewService),
-            nameof(CharacterInfoBoxGroupViewService.UpdateView),
-            new[] { typeof(CharacterDetailModel), typeof(Il2CppSystem.Nullable<>).MakeGenericType(tabType) });
+            typeof(CharacterAbilityUpInfoBoxViewService),
+            nameof(CharacterAbilityUpInfoBoxViewService.UpdateParameterViews),
+            new[] { typeof(int) });
         if (target == null)
         {
             throw new MissingMemberException(
-                typeof(CharacterInfoBoxGroupViewService).FullName +
-                " no longer declares UpdateView(CharacterDetailModel, TabType?).");
+                typeof(CharacterAbilityUpInfoBoxViewService).FullName + " no longer declares UpdateParameterViews(int).");
         }
 
         return target;
@@ -265,27 +248,14 @@ internal static class CharacterAbilityLocalViewPatch
         }
     }
 
-    internal static void PrefixRestoreTrackedButtons(
-        CharacterInfoBoxGroupViewService __instance)
+    internal static void PostfixReadOnlyView(CharacterAbilityUpInfoBoxViewService? __instance)
     {
-        var viewService = AbilityViewServiceOf(__instance);
-        if (viewService == null)
+        if (__instance == null)
         {
             return;
         }
 
-        // Undo only this patch's previous component.enabled changes before native UpdateView runs.
-        // Native code can then calculate the selected character's button state from scratch.
-        ApplyAllMutationButtonStatesBestEffort(viewService, false, 0);
-    }
-
-    internal static void PostfixReadOnlyView(CharacterInfoBoxGroupViewService __instance)
-    {
-        var viewService = AbilityViewServiceOf(__instance);
-        if (viewService == null)
-        {
-            return;
-        }
+        var viewService = __instance;
 
         long mCharacterId;
         bool readOnly;
@@ -316,21 +286,6 @@ internal static class CharacterAbilityLocalViewPatch
             _loggedFirstReadOnlyView = true;
             CgUnlockPlugin.LogSource.LogInfo(
                 $"[CGUnlock] 未持有角色技能加减号可点，升级/解锁仍拦截: first_id={mCharacterId}");
-        }
-    }
-
-    private static CharacterAbilityUpInfoBoxViewService? AbilityViewServiceOf(
-        CharacterInfoBoxGroupViewService? groupViewService)
-    {
-        try
-        {
-            return groupViewService?._characterAbilityUpInfoBoxViewService;
-        }
-        catch (Exception exception)
-        {
-            CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 技能视图服务读取失败: error={exception.GetType().Name}");
-            return null;
         }
     }
 
@@ -735,8 +690,8 @@ internal static class CharacterAbilityLocalViewPatch
             return;
         }
 
-        // This restoration normally runs in PrefixRestoreTrackedButtons, before native UpdateView
-        // recalculates owned-character state. The postfix call is then a no-op for owned views.
+        // Native UpdateView has already recalculated the button state for an account-owned
+        // character, so restoring only the component.enabled flag this patch cleared is enough.
         var ownedViewPointer = IL2CPP.Il2CppObjectBaseToPtr(button);
         if (DisabledButtonPointers.Remove(ownedViewPointer))
         {

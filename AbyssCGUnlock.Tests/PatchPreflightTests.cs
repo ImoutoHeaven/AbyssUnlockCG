@@ -130,21 +130,25 @@ public sealed class PatchPreflightTests
     }
 
     /// <summary>
-    /// The read-only pass must hang off a method this build still calls. The ability box's own
-    /// UpdateView(CharacterDetailModel) has no call sites because IL2CPP inlined it into the group
-    /// refresh, so binding it there leaves every view untagged and the fail-closed command boundary
-    /// blocks account-owned characters as well.
+    /// The read-only pass must hang off a method this build still calls, and it must not take a
+    /// value-type parameter: a Nullable&lt;TabType&gt; hook aborts the whole detail refresh in the
+    /// native-to-managed trampoline (Buffer.Memmove NRE), leaving the skill tab on prefab
+    /// placeholder text. UpdateView(CharacterDetailModel) itself has no call sites because IL2CPP
+    /// inlined it into the group refresh.
     /// </summary>
     [Fact]
-    public void ReadOnly_pass_binds_the_group_refresh_that_the_build_calls()
+    public void ReadOnly_pass_binds_a_reachable_refresh_method_without_value_type_parameters()
     {
         RegisterGameProxyResolution();
 
-        var target = CharacterAbilityLocalViewPatch.TargetGroupViewMethod();
+        var target = CharacterAbilityLocalViewPatch.TargetAbilityViewRefreshMethod();
 
-        Assert.Equal(typeof(Project.CharacterDetail.CharacterInfoBoxGroupViewService), target.DeclaringType);
-        Assert.Equal("UpdateView", target.Name);
-        Assert.Equal(2, target.GetParameters().Length);
+        Assert.Equal("Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService", target.DeclaringType!.FullName);
+        Assert.Equal("UpdateParameterViews", target.Name);
+        foreach (var parameter in target.GetParameters())
+        {
+            Assert.False(parameter.ParameterType.IsValueType && !parameter.ParameterType.IsPrimitive);
+        }
     }
 
     private static string FindRepositoryRoot()
