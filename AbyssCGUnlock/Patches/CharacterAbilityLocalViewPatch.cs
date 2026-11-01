@@ -545,19 +545,20 @@ internal static class CharacterAbilityLocalViewPatch
         {
             var characterDetailModel = viewService._characterDetailModel;
             mCharacterId = characterDetailModel == null ? 0 : characterDetailModel.MCharacterId;
+
+            // The account's own rows decide. An unknown ID, or a registry-backed unowned
+            // character, fails closed before the UniTask/API call so a preview never mutates
+            // anything.
+            if (mCharacterId != 0 && IsCharacterIdOwnedByCurrentAccount(mCharacterId))
+            {
+                return false;
+            }
         }
         catch (Exception exception)
         {
             CgUnlockPlugin.LogSource.LogWarning(
                 $"[CGUnlock] 未持有角色技能变更命令识别失败，按未知来源阻断: command={command}, error={exception}");
             return true;
-        }
-
-        // The account's own rows decide. An unknown ID, or a registry-backed unowned character,
-        // fails closed before the UniTask/API call so a preview never mutates anything.
-        if (mCharacterId != 0 && IsCharacterIdOwnedByCurrentAccount(mCharacterId))
-        {
-            return false;
         }
 
         if (!_loggedFirstBlockedMutation)
