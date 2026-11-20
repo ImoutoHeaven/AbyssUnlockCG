@@ -37,7 +37,10 @@ internal static class CharacterAbilityLocalViewPatch
     private static bool _loggedFirstReadOnlyView;
     private static bool _loggedFirstBlockedMutation;
 
-    private static PropertyInfo _unlockCommandSourceProperty = null!;
+    private static PropertyInfo _abilityUpCommandOwnerProperty = null!;
+    private static PropertyInfo _abilityUpCommandStateProperty = null!;
+    private static PropertyInfo _unlockCommandOwnerProperty = null!;
+    private static PropertyInfo _unlockCommandStateProperty = null!;
 
     internal static MethodBase TargetModelFactoryMethod()
     {
@@ -75,37 +78,66 @@ internal static class CharacterAbilityLocalViewPatch
         return target;
     }
 
+    /// <summary>
+    /// Guards the level-up mutation on its async body, not on the callback that starts it.
+    ///
+    /// Two earlier bindings were both wrong. The original hooked a compiler-generated UniRx lambda
+    /// (<c>_InitializeViewAsync_b__15_1</c>), which the 2026-11-20 build renumbered to <c>b__17_N</c>
+    /// while leaving four siblings on the exact same signature. Binding the declared
+    /// <c>AbilityUpAsync()</c> kickoff instead does not help either: IL2CPP inlines that two-line
+    /// kickoff into its callers, so the native level-up confirm callback calls
+    /// <c>&lt;AbilityUpAsync&gt;d__N.MoveNext</c> directly and the kickoff is never invoked. The state
+    /// machine type name carries an index, but <see cref="GeneratedTargets.FindStateMachine"/> keys on
+    /// the async method name, and <c>MoveNext</c> is the body the request is actually sent from.
+    /// </summary>
     internal static MethodBase TargetAbilityUpCommandMethod()
     {
-        return GeneratedTargets.FindClosureMethod(
-            typeof(CharacterAbilityUpInfoBoxViewService),
-            "_InitializeViewAsync_b__15_1",
-            new[] { typeof(UniRx.Unit), typeof(CharacterAbilityUpInfoBoxViewService) });
+        return ResolveCommandMoveNext(
+            nameof(CharacterAbilityUpInfoBoxViewService.AbilityUpAsync),
+            out _abilityUpCommandOwnerProperty,
+            out _abilityUpCommandStateProperty);
     }
 
+    /// <summary>
+    /// Same binding rule as <see cref="TargetAbilityUpCommandMethod"/>: the unlock confirm callback
+    /// calls <c>&lt;UnlockAbilityAsync&gt;d__N.MoveNext</c> directly and never goes through the
+    /// kickoff, so the guard hangs off that body.
+    /// </summary>
     internal static MethodBase TargetUnlockCommandMethod()
     {
-        var target = GeneratedTargets.FindClosureMethod(
+        return ResolveCommandMoveNext(
+            nameof(CharacterAbilityUpInfoBoxViewService.UnlockAbilityAsync),
+            out _unlockCommandOwnerProperty,
+            out _unlockCommandStateProperty);
+    }
+
+    private static MethodBase ResolveCommandMoveNext(
+        string asyncMethodName,
+        out PropertyInfo ownerProperty,
+        out PropertyInfo stateProperty)
+    {
+        var stateMachine = GeneratedTargets.FindStateMachine(
             typeof(CharacterAbilityUpInfoBoxViewService),
-            "_OpenUnlockConfirmPopupAsync_b__0",
-            Type.EmptyTypes);
+            asyncMethodName);
 
         // Fail closed on capture drift: the Prefix reads the owning view service by name.
-        var owner = target.DeclaringType!;
-        _unlockCommandSourceProperty = AccessTools.Property(owner, "__4__this");
-        if (_unlockCommandSourceProperty == null)
-        {
-            throw new MissingMemberException(owner.FullName + " no longer captures <>4__this.");
-        }
-
-        if (_unlockCommandSourceProperty.PropertyType != typeof(CharacterAbilityUpInfoBoxViewService))
+        ownerProperty = AccessTools.Property(stateMachine, "__4__this");
+        if (ownerProperty == null ||
+            ownerProperty.PropertyType != typeof(CharacterAbilityUpInfoBoxViewService))
         {
             throw new MissingMemberException(
-                owner.FullName + " captured <>4__this as " + _unlockCommandSourceProperty.PropertyType.FullName +
-                ", expected " + typeof(CharacterAbilityUpInfoBoxViewService).FullName + ".");
+                stateMachine.FullName + " no longer captures <>4__this as " +
+                typeof(CharacterAbilityUpInfoBoxViewService).FullName + ".");
         }
 
-        return target;
+        stateProperty = AccessTools.Property(stateMachine, "__1__state");
+        if (stateProperty == null || stateProperty.PropertyType != typeof(int))
+        {
+            throw new MissingMemberException(stateMachine.FullName + " no longer exposes an int <>1__state.");
+        }
+
+        return AccessTools.Method(stateMachine, "MoveNext", Type.EmptyTypes)
+               ?? throw new MissingMemberException(stateMachine.FullName + " no longer declares MoveNext().");
     }
 
     internal static MethodBase TargetExpectedAbilityMethod()
@@ -380,26 +412,70 @@ internal static class CharacterAbilityLocalViewPatch
         }
     }
 
-    internal static bool PrefixAbilityUpCommand(CharacterAbilityUpInfoBoxViewService viewService)
+    internal static bool PrefixAbilityUpCommand(object __instance)
     {
-        return !ShouldBlockMutationCommand(viewService, "ability_up");
+        return !ShouldBlockCommandBody(
+            __instance,
+            _abilityUpCommandOwnerProperty,
+            _abilityUpCommandStateProperty,
+            "ability_up");
     }
 
     internal static bool PrefixUnlockCommand(object __instance)
     {
-        CharacterAbilityUpInfoBoxViewService? viewService = null;
+        return !ShouldBlockCommandBody(
+            __instance,
+            _unlockCommandOwnerProperty,
+            _unlockCommandStateProperty,
+            "ability_unlock");
+    }
+
+    /// <summary>
+    /// Blocks the not-yet-started body only (<c>&lt;&gt;1__state == -1</c>). Skipping a later resume
+    /// would strand a builder that already suspended on the original request, so an in-flight call
+    /// keeps running to completion; the guard exists to stop one from starting at all.
+    ///
+    /// Both guarded bodies return non-generic <c>UniTask</c>, and UniTask hands back a completed task
+    /// when the builder never suspended, so a skipped body leaves the caller with a finished await
+    /// instead of a hang. An unreadable capture or state blocks: the body must not run when its
+    /// character cannot be identified.
+    /// </summary>
+    private static bool ShouldBlockCommandBody(
+        object? stateMachine,
+        PropertyInfo ownerProperty,
+        PropertyInfo stateProperty,
+        string command)
+    {
+        if (stateMachine == null)
+        {
+            return PluginConfig.EnableUnownedCharacterSkillView.Value;
+        }
+
+        CharacterAbilityUpInfoBoxViewService? viewService;
+        int state;
         try
         {
-            viewService = _unlockCommandSourceProperty.GetValue(__instance) as CharacterAbilityUpInfoBoxViewService;
+            state = (int)stateProperty.GetValue(stateMachine)!;
+            viewService = ownerProperty.GetValue(stateMachine) as CharacterAbilityUpInfoBoxViewService;
         }
         catch (Exception exception)
         {
+            if (!PluginConfig.EnableUnownedCharacterSkillView.Value)
+            {
+                return false;
+            }
+
             CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 未持有角色技能解锁命令来源解析失败，按未知来源阻断: error={exception}");
+                $"[CGUnlock] 未持有角色技能命令来源解析失败，按未知来源阻断: command={command}, error={exception}");
+            return true;
+        }
+
+        if (state != -1)
+        {
             return false;
         }
 
-        return !ShouldBlockMutationCommand(viewService, "ability_unlock");
+        return ShouldBlockMutationCommand(viewService, command);
     }
 
     private static bool IsUnownedSkillCharacter(long mCharacterId)
