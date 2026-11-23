@@ -24,10 +24,9 @@ namespace AbyssCGUnlock.Patches;
 /// the local expected level preview.
 ///
 /// Ownership is resolved from the view's current CharacterDetailModel against the account's own
-/// CharacterData rows. It is never granted by a view tag: the ability box's own
-/// UpdateView(CharacterDetailModel) has no call sites in the 2026-10-30 build because IL2CPP
-/// inlined it into CharacterInfoBoxGroupViewService.UpdateView, so a tag written there never
-/// existed and the fail-closed command boundary blocked every account-owned character too.
+/// CharacterData rows. The ability box's own UpdateView(CharacterDetailModel) has no call sites
+/// because IL2CPP inlines it into the group refresh, so the ownership-aware control state is
+/// applied at the reachable UpdateParameterViews refresh.
 /// </summary>
 internal static class CharacterAbilityLocalViewPatch
 {
@@ -35,13 +34,6 @@ internal static class CharacterAbilityLocalViewPatch
     private static bool _loggedFirstMasterModel;
     private static bool _loggedFirstProjectedPresentation;
     private static bool _loggedFirstReadOnlyView;
-    private static bool _loggedFirstBlockedMutation;
-
-    private static PropertyInfo _abilityUpCommandOwnerProperty = null!;
-    private static PropertyInfo _abilityUpCommandStateProperty = null!;
-    private static PropertyInfo _unlockCommandOwnerProperty = null!;
-    private static PropertyInfo _unlockCommandStateProperty = null!;
-
     internal static MethodBase TargetModelFactoryMethod()
     {
         return AccessTools.Method(
@@ -76,68 +68,6 @@ internal static class CharacterAbilityLocalViewPatch
         }
 
         return target;
-    }
-
-    /// <summary>
-    /// Guards the level-up mutation on its async body, not on the callback that starts it.
-    ///
-    /// Two earlier bindings were both wrong. The original hooked a compiler-generated UniRx lambda
-    /// (<c>_InitializeViewAsync_b__15_1</c>), which the 2026-11-20 build renumbered to <c>b__17_N</c>
-    /// while leaving four siblings on the exact same signature. Binding the declared
-    /// <c>AbilityUpAsync()</c> kickoff instead does not help either: IL2CPP inlines that two-line
-    /// kickoff into its callers, so the native level-up confirm callback calls
-    /// <c>&lt;AbilityUpAsync&gt;d__N.MoveNext</c> directly and the kickoff is never invoked. The state
-    /// machine type name carries an index, but <see cref="GeneratedTargets.FindStateMachine"/> keys on
-    /// the async method name, and <c>MoveNext</c> is the body the request is actually sent from.
-    /// </summary>
-    internal static MethodBase TargetAbilityUpCommandMethod()
-    {
-        return ResolveCommandMoveNext(
-            nameof(CharacterAbilityUpInfoBoxViewService.AbilityUpAsync),
-            out _abilityUpCommandOwnerProperty,
-            out _abilityUpCommandStateProperty);
-    }
-
-    /// <summary>
-    /// Same binding rule as <see cref="TargetAbilityUpCommandMethod"/>: the unlock confirm callback
-    /// calls <c>&lt;UnlockAbilityAsync&gt;d__N.MoveNext</c> directly and never goes through the
-    /// kickoff, so the guard hangs off that body.
-    /// </summary>
-    internal static MethodBase TargetUnlockCommandMethod()
-    {
-        return ResolveCommandMoveNext(
-            nameof(CharacterAbilityUpInfoBoxViewService.UnlockAbilityAsync),
-            out _unlockCommandOwnerProperty,
-            out _unlockCommandStateProperty);
-    }
-
-    private static MethodBase ResolveCommandMoveNext(
-        string asyncMethodName,
-        out PropertyInfo ownerProperty,
-        out PropertyInfo stateProperty)
-    {
-        var stateMachine = GeneratedTargets.FindStateMachine(
-            typeof(CharacterAbilityUpInfoBoxViewService),
-            asyncMethodName);
-
-        // Fail closed on capture drift: the Prefix reads the owning view service by name.
-        ownerProperty = AccessTools.Property(stateMachine, "__4__this");
-        if (ownerProperty == null ||
-            ownerProperty.PropertyType != typeof(CharacterAbilityUpInfoBoxViewService))
-        {
-            throw new MissingMemberException(
-                stateMachine.FullName + " no longer captures <>4__this as " +
-                typeof(CharacterAbilityUpInfoBoxViewService).FullName + ".");
-        }
-
-        stateProperty = AccessTools.Property(stateMachine, "__1__state");
-        if (stateProperty == null || stateProperty.PropertyType != typeof(int))
-        {
-            throw new MissingMemberException(stateMachine.FullName + " no longer exposes an int <>1__state.");
-        }
-
-        return AccessTools.Method(stateMachine, "MoveNext", Type.EmptyTypes)
-               ?? throw new MissingMemberException(stateMachine.FullName + " no longer declares MoveNext().");
     }
 
     internal static MethodBase TargetExpectedAbilityMethod()
@@ -412,72 +342,6 @@ internal static class CharacterAbilityLocalViewPatch
         }
     }
 
-    internal static bool PrefixAbilityUpCommand(object __instance)
-    {
-        return !ShouldBlockCommandBody(
-            __instance,
-            _abilityUpCommandOwnerProperty,
-            _abilityUpCommandStateProperty,
-            "ability_up");
-    }
-
-    internal static bool PrefixUnlockCommand(object __instance)
-    {
-        return !ShouldBlockCommandBody(
-            __instance,
-            _unlockCommandOwnerProperty,
-            _unlockCommandStateProperty,
-            "ability_unlock");
-    }
-
-    /// <summary>
-    /// Blocks the not-yet-started body only (<c>&lt;&gt;1__state == -1</c>). Skipping a later resume
-    /// would strand a builder that already suspended on the original request, so an in-flight call
-    /// keeps running to completion; the guard exists to stop one from starting at all.
-    ///
-    /// Both guarded bodies return non-generic <c>UniTask</c>, and UniTask hands back a completed task
-    /// when the builder never suspended, so a skipped body leaves the caller with a finished await
-    /// instead of a hang. An unreadable capture or state blocks: the body must not run when its
-    /// character cannot be identified.
-    /// </summary>
-    private static bool ShouldBlockCommandBody(
-        object? stateMachine,
-        PropertyInfo ownerProperty,
-        PropertyInfo stateProperty,
-        string command)
-    {
-        if (stateMachine == null)
-        {
-            return PluginConfig.EnableUnownedCharacterSkillView.Value;
-        }
-
-        CharacterAbilityUpInfoBoxViewService? viewService;
-        int state;
-        try
-        {
-            state = (int)stateProperty.GetValue(stateMachine)!;
-            viewService = ownerProperty.GetValue(stateMachine) as CharacterAbilityUpInfoBoxViewService;
-        }
-        catch (Exception exception)
-        {
-            if (!PluginConfig.EnableUnownedCharacterSkillView.Value)
-            {
-                return false;
-            }
-
-            CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 未持有角色技能命令来源解析失败，按未知来源阻断: command={command}, error={exception}");
-            return true;
-        }
-
-        if (state != -1)
-        {
-            return false;
-        }
-
-        return ShouldBlockMutationCommand(viewService, command);
-    }
-
     private static bool IsUnownedSkillCharacter(long mCharacterId)
     {
         if (!PluginConfig.EnableUnownedCharacterSkillView.Value)
@@ -555,51 +419,6 @@ internal static class CharacterAbilityLocalViewPatch
         }
 
         return false;
-    }
-
-    private static bool ShouldBlockMutationCommand(
-        CharacterAbilityUpInfoBoxViewService? viewService,
-        string command)
-    {
-        if (!PluginConfig.EnableUnownedCharacterSkillView.Value)
-        {
-            return false;
-        }
-
-        if (viewService == null)
-        {
-            return true;
-        }
-
-        long mCharacterId;
-        try
-        {
-            var characterDetailModel = viewService._characterDetailModel;
-            mCharacterId = characterDetailModel == null ? 0 : characterDetailModel.MCharacterId;
-
-            // The account's own rows decide. An unknown ID, or a registry-backed unowned
-            // character, fails closed before the UniTask/API call so a preview never mutates
-            // anything.
-            if (mCharacterId != 0 && IsCharacterIdOwnedByCurrentAccount(mCharacterId))
-            {
-                return false;
-            }
-        }
-        catch (Exception exception)
-        {
-            CgUnlockPlugin.LogSource.LogWarning(
-                $"[CGUnlock] 未持有角色技能变更命令识别失败，按未知来源阻断: command={command}, error={exception}");
-            return true;
-        }
-
-        if (!_loggedFirstBlockedMutation)
-        {
-            _loggedFirstBlockedMutation = true;
-            CgUnlockPlugin.LogSource.LogInfo(
-                $"[CGUnlock] 未持有角色技能变更命令已在同步点击边界拦截: command={command}, id={mCharacterId}");
-        }
-
-        return true;
     }
 
     private static void ApplyAllMutationButtonStatesBestEffort(

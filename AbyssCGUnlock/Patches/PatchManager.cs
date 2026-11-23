@@ -44,6 +44,12 @@ internal static class PatchManager
             NovelReadBypassPatch.TargetMethod,
             static (_, target) => NovelReadBypassPatch.Install(target)),
         new PatchRegistration(
+            nameof(ServerErrorTracePatch) + "." + nameof(ServerErrorTracePatch.TargetMethod),
+            ServerErrorTracePatch.TargetMethod,
+            static (harmony, target) => harmony.Patch(
+                target,
+                prefix: new HarmonyMethod(typeof(ServerErrorTracePatch), nameof(ServerErrorTracePatch.Prefix)))),
+        new PatchRegistration(
             nameof(CharacterTopLocalUnlockPatch) + "." + nameof(CharacterTopLocalUnlockPatch.TargetMethod),
             CharacterTopLocalUnlockPatch.TargetMethod,
             static (harmony, target) => harmony.Patch(
@@ -119,18 +125,6 @@ internal static class PatchManager
             static (harmony, target) => harmony.Patch(
                 target,
                 postfix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PostfixReadOnlyView)))),
-        new PatchRegistration(
-            nameof(CharacterAbilityLocalViewPatch) + "." + nameof(CharacterAbilityLocalViewPatch.TargetAbilityUpCommandMethod),
-            CharacterAbilityLocalViewPatch.TargetAbilityUpCommandMethod,
-            static (harmony, target) => harmony.Patch(
-                target,
-                prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixAbilityUpCommand)))),
-        new PatchRegistration(
-            nameof(CharacterAbilityLocalViewPatch) + "." + nameof(CharacterAbilityLocalViewPatch.TargetUnlockCommandMethod),
-            CharacterAbilityLocalViewPatch.TargetUnlockCommandMethod,
-            static (harmony, target) => harmony.Patch(
-                target,
-                prefix: new HarmonyMethod(typeof(CharacterAbilityLocalViewPatch), nameof(CharacterAbilityLocalViewPatch.PrefixUnlockCommand)))),
         new PatchRegistration(
             nameof(CharacterAbilityLocalViewPatch) + "." + nameof(CharacterAbilityLocalViewPatch.TargetExpectedAbilityMethod),
             CharacterAbilityLocalViewPatch.TargetExpectedAbilityMethod,

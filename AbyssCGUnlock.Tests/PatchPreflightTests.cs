@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Xml.Linq;
 using AbyssCGUnlock.Patches;
 using HarmonyLib;
 using Xunit;
@@ -83,9 +84,30 @@ public sealed class PatchPreflightTests
 
         var plan = PatchManager.PreflightTargets();
 
-        Assert.Equal(26, plan.TargetCount);
+        Assert.Equal(25, plan.TargetCount);
         Assert.Empty(plan.Failures);
-        Assert.Equal(26, plan.Installers.Count);
+        Assert.Equal(25, plan.Installers.Count);
+    }
+
+    [Fact]
+    public void Server_busy_diagnostic_targets_the_current_error_formatter()
+    {
+        RegisterGameProxyResolution();
+
+        var target = ServerErrorTracePatch.TargetMethod();
+
+        Assert.Equal("Project.Api.ApiErrorMessageBuilder", target.DeclaringType!.FullName);
+        Assert.Equal("FormatServerErrorMessage", target.Name);
+        Assert.Equal(typeof(int), Assert.Single(target.GetParameters()).ParameterType);
+    }
+
+    [Fact]
+    public void Plugin_version_matches_the_project_version()
+    {
+        var project = XDocument.Load(Path.Combine(FindRepositoryRoot(), "AbyssCGUnlock", "AbyssCGUnlock.csproj"));
+        var version = project.Root!.Element("PropertyGroup")!.Element("Version")!.Value;
+
+        Assert.Equal(PluginInfo.PluginVersion, version);
     }
 
     /// <summary>
@@ -149,37 +171,6 @@ public sealed class PatchPreflightTests
         {
             Assert.False(parameter.ParameterType.IsValueType && !parameter.ParameterType.IsPrimitive);
         }
-    }
-
-    /// <summary>
-    /// The two mutation guards bind the async body that sends the request, not the callback that
-    /// starts it. IL2CPP inlines the two-line `AbilityUpAsync()`/`UnlockAbilityAsync()` kickoffs into
-    /// their callers, so the native confirm callbacks call `<Method>d__N.MoveNext` directly and a
-    /// patch on the kickoff never runs. The state machine index drifts on every update, so the
-    /// resolver keys on the async method name and validates the captured owner.
-    /// </summary>
-    [Fact]
-    public void Mutation_guards_bind_the_async_bodies_that_send_the_request()
-    {
-        RegisterGameProxyResolution();
-
-        var abilityUp = CharacterAbilityLocalViewPatch.TargetAbilityUpCommandMethod();
-
-        Assert.Equal("MoveNext", abilityUp.Name);
-        Assert.Empty(abilityUp.GetParameters());
-        Assert.StartsWith("_AbilityUpAsync_d__", abilityUp.DeclaringType!.Name);
-        Assert.Equal(
-            "Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService",
-            abilityUp.DeclaringType.GetProperty("__4__this", BindingFlags.Public | BindingFlags.Instance)?.PropertyType.FullName);
-
-        var unlock = CharacterAbilityLocalViewPatch.TargetUnlockCommandMethod();
-
-        Assert.Equal("MoveNext", unlock.Name);
-        Assert.Empty(unlock.GetParameters());
-        Assert.StartsWith("_UnlockAbilityAsync_d__", unlock.DeclaringType!.Name);
-        Assert.Equal(
-            "Project.CharacterDetail.CharacterAbilityUpInfoBoxViewService",
-            unlock.DeclaringType.GetProperty("__4__this", BindingFlags.Public | BindingFlags.Instance)?.PropertyType.FullName);
     }
 
     private static string FindRepositoryRoot()

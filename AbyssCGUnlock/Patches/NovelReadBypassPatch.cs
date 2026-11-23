@@ -67,7 +67,11 @@ internal static class NovelReadBypassPatch
     private static (byte[] Bytes, object Root) CreateLocalResult(int novelType, long novelId)
     {
         if (!ShouldBypass(PluginConfig.EnableNovelReadBypass.Value, novelType))
+        {
+            CgUnlockPlugin.LogSource.LogInfo(
+                $"[CGUnlock trace] NovelRead API pass-through: type={(NovelType)novelType}, novelId={novelId}");
             return default;
+        }
 
         var fake = new NovelReadResponseEntity
         {
